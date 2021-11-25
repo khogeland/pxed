@@ -1,0 +1,8 @@
+const
+  SCREEN_HEIGHT* = 128
+  SCREEN_WIDTH* = 128
+  #SCREEN_HEIGHT_2* = 64
+  #SCREEN_WIDTH_2* = 96
+  BUFFER_LENGTH* = SCREEN_HEIGHT * SCREEN_WIDTH * 2
+
+type framebuffer* = array[BUFFER_LENGTH, uint8]

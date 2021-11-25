@@ -1,0 +1,6 @@
+[submodule "vendor/gifenc"]
+	path = vendor/gifenc
+	url = https://github.com/lecram/gifenc
+[submodule "vendor/--force"]
+	path = vendor/--force
+	url = https://github.com/lecram/gifenc
