@@ -1,3 +1,4 @@
+{.experimental: "dotOperators".}
 import device/spi
 import device/ssd1351
 import constants

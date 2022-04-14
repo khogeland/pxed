@@ -51,7 +51,7 @@ app_main():
       let o = getNextInputEvent()
       if o.isNone: break
       let inputEvent = o.get()
-      var momentary: set[MomentaryInput]
+      var instant: set[InstantInput]
       case inputEvent.eventType:
         of ButtonEvent:
           let eButton = BUTTON_MAP[inputEvent.button]
@@ -59,7 +59,7 @@ app_main():
             of ButtonPressed: currentlyPressed.incl(eButton)
             of ButtonReleased: currentlyPressed.excl(eButton)
         of TrackballEvent:
-          momentary.incl(TRACKBALL_MAP[inputEvent.direction])
-      ed.handleInput(currentlyPressed, momentary)
+          instant.incl(TRACKBALL_MAP[inputEvent.direction])
+      ed.handleInput(currentlyPressed, instant)
     withBuffer:
       ed.draw(buffer)

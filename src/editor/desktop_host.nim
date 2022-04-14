@@ -40,7 +40,7 @@ if init() == 0:
   quit("Failed to Initialize GLFW.")
 
 var pressed: set[ButtonInput]
-var momentary: set[MomentaryInput]
+var instant: set[InstantInput]
 
 const GLMap = {
   KEY_UP: E_Up,
@@ -50,7 +50,7 @@ const GLMap = {
   KEY_Z: E_A,
   KEY_X: E_B,
   KEY_A: E_X,
-  KEY_R: E_Y,
+  KEY_S: E_Y,
 }.toTable
 
 proc keyProc(window: Window, key: cint, scancode: cint, action: cint, modifiers: cint) =
@@ -65,14 +65,14 @@ proc keyProc(window: Window, key: cint, scancode: cint, action: cint, modifiers:
 
 proc scrollProc(window: Window, xoffset: cdouble, yoffset: cdouble) =
   if xoffset > 0.4:
-    momentary.incl(E_ScrollRight)
+    instant.incl(E_ScrollRight)
   elif xoffset < -0.4:
-    momentary.incl(E_ScrollLeft)
+    instant.incl(E_ScrollLeft)
   # depends on natural scroll direction. whatever.
   if yoffset < -0.4:
-    momentary.incl(E_ScrollUp)
+    instant.incl(E_ScrollUp)
   elif yoffset > 0.4:
-    momentary.incl(E_ScrollDown)
+    instant.incl(E_ScrollDown)
 
 windowHint(RESIZABLE, false.cint)
 window = createWindow(w.cint, h.cint, "pxed", nil, nil)
@@ -96,7 +96,7 @@ glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
 glEnable(GL_TEXTURE_2D)
 
 while windowShouldClose(window) != 1:
+  instant = {}
   pollEvents()
-  momentary = {}
-  ed.handleInput(pressed, momentary)
+  ed.handleInput(pressed, instant)
   display()

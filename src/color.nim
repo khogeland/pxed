@@ -2,6 +2,8 @@ import math
 #
 
 type
+  # TODO TODO TODO TODO refactor to use 18-bit mode
+  # i think i chose this for convenience but that's a stupid reason to impose limits
   # Store things as 16-bit RGB for consistency
   RGB16Color* = uint16
   RGBColor* = object
@@ -11,6 +13,13 @@ type
 
 func rgb*(r, g, b: float): RGBColor = RGBColor(red: r, green: g, blue: b)
 func hsv*(h, s, v: float): HSVColor = HSVColor(hue: h, saturation: s, value: v)
+
+func invertColor*(hsv: HSVColor): HSVColor =
+  result = hsv
+  result.hue += 180.0 
+  if result.hue > 360.0:
+    result.hue -= 360.0
+  result.value = 1 - hsv.value
 
 func rgbToHsv*(rgb: RGBColor): HSVColor =
   let r = rgb.red
@@ -70,7 +79,7 @@ proc hsvToRgb*(hsv: HSVColor): RGBColor =
       blue: v,
     )
   var h = hsv.hue
-  if h > 360.0:
+  if h > 359.99:
     h = 0.0
   h /= 60.0
   let i = int(h)
@@ -160,14 +169,17 @@ proc hsvToRgb*(hsv: HSVColor): RGBColor =
 func RGB16asRGB*(rgb16: RGB16Color): RGBColor =
   # RRRRRGGG GGGBBBBB (in order)
   return RGBColor(
-    red: float(rgb16 shr 11)/255.0,
-    green: float((rgb16 shr 5) and 0b111111)/255.0,
-    blue: float(rgb16 and 0b11111)/255.0,
+    red: float((rgb16 shr 8)   and 0b11111000)/255.0,
+    green: float((rgb16 shr 3) and 0b11111100)/255.0,
+    blue: float((rgb16 shl 3)  and 0b11111000)/255.0,
   )
 
 proc RGBasRGB16*(rgb: RGBColor): RGB16Color =
   let r = uint16(toInt(rgb.red * 255.0)) shr 3
   let g = uint16(toInt(rgb.green * 255.0)) shr 2
   let b = uint16(toInt(rgb.blue * 255.0)) shr 3
-  echo (r, g, b)
   return (r shl 11) or (g shl 5) or b
+
+func invertColor*(rgb: RGB16Color): RGB16Color =
+  #TODO: LMFAO. LOL.
+  return RGBasRGB16(hsvToRgb(invertColor(rgbToHsv(RGB16asRGB(rgb)))))
