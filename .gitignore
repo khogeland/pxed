@@ -2,3 +2,4 @@ build/
 nimcache/
 editor/desktop_host
 tags
+sdkconfig.old

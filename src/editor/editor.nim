@@ -3,31 +3,13 @@ import constants
 import color
 import picker
 
-type ButtonInput* = enum
-  E_Up
-  E_Down
-  E_Left
-  E_Right
-  E_A
-  E_B
-  E_X
-  E_Y
-  E_L
-  E_R
-
-type InstantInput* = enum
-  E_ScrollUp
-  E_ScrollDown
-  E_ScrollRight
-  E_ScrollLeft
-
 type Palette = object
   size: uint8
   colors: array[256, RGB16Color]
 
 proc rgb16(r, g, b: float): uint16 =
-  let r5: uint16 = uint16(r * 255) shr 3
-  let g6: uint16 = uint16(g * 255) shr 2
+  let r5: uint16 = (uint16(r * 255) shr 3)
+  let g6: uint16 = (uint16(g * 255) shr 2)
   let b5: uint16 = uint16(b * 255) shr 3
   return (r5 shl 11) or (g6 shl 5) or b5
 
@@ -56,7 +38,7 @@ const
 type UIType = enum
   editorUI, pickerUI
 
-type Editor[W, H: static int] = object
+type Editor*[W, H: static int] = object
   cursorX*: int
   cursorY*: int
   cursorColor: uint8
@@ -64,7 +46,6 @@ type Editor[W, H: static int] = object
   contents: array[W, array[H, uint8]]
   palette: Palette
   currentUI: UIType
-  colorPicker: ColorPicker
 
 proc initEditor*[W, H: static int](): Editor[W, H] =
   let palette = Palette(
@@ -72,19 +53,40 @@ proc initEditor*[W, H: static int](): Editor[W, H] =
       size: initialPaletteSize,
     )
   return Editor[W, H](
-    cursorColor: 2,
+    cursorColor: 0,
     palette: palette,
-    colorPicker: initPicker(palette[2]),
     currentUI: editorUI,
   )
 
 proc `[]`*(editor: Editor, x, y: int): uint8 = editor.contents[x][y]
 proc `[]=`*(editor: var Editor, x, y: int, c: uint8) = editor.contents[x][y] = c
 
+# TODO
+proc saveState*(editor: Editor): void =
+  discard
+
+proc flood[W, H: static int](editor: var Editor[W, H], x, y: int, newColor: uint8): void =
+  let oldColor = editor[x, y]
+  if oldColor == newColor:
+    return
+  var queue: seq[(int, int)] = @[(x, y)]
+  while len(queue) != 0:
+    let (ix, iy) = queue.pop()
+    if editor[ix, iy] == oldColor:
+      editor[ix, iy] = newColor
+      if ix > 0:
+        queue.add((ix-1, iy))
+      if ix < W-1:
+        queue.add((ix+1, iy))
+      if iy > 0:
+        queue.add((ix, iy-1))
+      if iy < H-1:
+        queue.add((ix, iy+1))
+
 # Editor W H, Factor
 proc draw*[W, H: static int](editor: Editor[W, H], buffer: var framebuffer) =
   if editor.currentUI == pickerUI:
-    editor.colorPicker.draw(buffer)
+    drawPicker(buffer)
     return
   const f = SCREEN_HEIGHT div W
   const tileByteWidth = f * 2
@@ -119,21 +121,25 @@ proc draw*[W, H: static int](editor: Editor[W, H], buffer: var framebuffer) =
     buffer[i] = color1
     buffer[i+1] = color2
 
-  let x1 = (editor.cursorX * f) - 1
-  let y1 = (editor.cursorY * f) - 1
-  let x2 = (editor.cursorX * f) + f
-  let y2 = (editor.cursorY * f) + f
-  let inverted = invertColor(cursorColor)
+  #let x1 = (editor.cursorX * f) - 1
+  #let y1 = (editor.cursorY * f) - 1
+  #let x2 = (editor.cursorX * f) + f
+  #let y2 = (editor.cursorY * f) + f
+  let inverted = hsvToRgb(invertColor(rgbToHsv(cursorColor)))
+  buffer[editor.cursorX * f, editor.cursorY * f] = inverted
 
-  for x in x1..x2:
-    for y in y1..y2:
-      if x < 0 or x > W * f - 1 or y < 0 or y > H * f - 1:
-        continue
-      if y == y1 or y == y2:
-        buffer[x, y] = inverted
-      if x == x1 or x == x2:
-        buffer[x, y] = inverted
+  #for x in x1..x2:
+    #for y in y1..y2:
+      #if x < 0 or x > W * f - 1 or y < 0 or y > H * f - 1:
+        #continue
+      #if y == y1 or y == y2:
+        #buffer[x, y] = inverted
+      #if x == x1 or x == x2:
+        #buffer[x, y] = inverted
     
+proc moveCursor[W, H](e: var Editor[W, H], x, y: int): void =
+  e.cursorX = max(0, min(W-1, e.cursorX+x))
+  e.cursorY = max(0, min(H-1, e.cursorY+y))
 
 
 proc handleInput*[W, H](editor: var Editor[W, H], pressed: set[ButtonInput], instant: set[InstantInput]) =
@@ -143,59 +149,74 @@ proc handleInput*[W, H](editor: var Editor[W, H], pressed: set[ButtonInput], ins
   if E_Y in pressed:
     editor.currentUI = pickerUI
     if E_Y in newPressed:
-      editor.colorPicker = initPicker(editor.palette[editor.cursorColor])
+      initPicker(editor.palette[editor.cursorColor])
     else:
-      if E_Up in pressed:
-        editor.colorPicker.moveCursor(UP)
-      elif E_Down in pressed:
-        editor.colorPicker.moveCursor(DOWN)
-      elif E_Left in pressed:
-        editor.colorPicker.moveCursor(LEFT)
-      elif E_Right in pressed:
-        editor.colorPicker.moveCursor(RIGHT)
+      if E_Up in newPressed:
+        movePickerCursor(0, +1)
+      elif E_Down in newPressed:
+        movePickerCursor(0, -1)
+      elif E_Left in newPressed:
+        movePickerCursor(-1, 0)
+      elif E_Right in newPressed:
+        movePickerCursor(+1, 0)
 
-    editor.palette[editor.cursorColor] = editor.colorPicker.cursorColor()
+    editor.palette[editor.cursorColor] = pickerCursorColor()
   else:
     editor.currentUI = editorUI
   case editor.currentUI:
     of editorUI:
       if E_Up in newPressed:
-        editor.cursorY = min(editor.cursorY + 1, editor.H - 1)
+        editor.moveCursor(0, +1)
       elif E_Down in newPressed:
-        editor.cursorY = max(editor.cursorY - 1, 0)
-      if E_Right in newPressed:
-        if E_X in pressed:
-          editor.cursorColor += 1
-          if editor.cursorColor > editor.palette.size-1:
-            editor.cursorColor = 0
-        else:
-          editor.cursorX = min(editor.cursorX + 1, editor.W - 1)
-      elif E_Left in newPressed:
-        if E_X in pressed:
+        editor.moveCursor(0, -1)
+      elif E_B in pressed:
+        if E_X in newPressed: # flood fill, hard to press
+          editor.flood(editor.cursorX, editor.cursorY, editor.cursorColor)
+        elif E_Y in newPressed: # eyedropper
+          editor.cursorColor = editor[editor.cursorX, editor.cursorY]
+      elif E_X in pressed:
+        if E_Left in newPressed or E_ScrollUp in instant:
           editor.cursorColor -= 1
           if editor.cursorColor == 255:
             editor.cursorColor = editor.palette.size
-        else:
-          editor.cursorX = max(editor.cursorX - 1, 0)
-
-      if E_A in pressed:
+        elif E_Right in newPressed or E_ScrollDown in instant:
+          editor.cursorColor += 1
+          if editor.cursorColor > editor.palette.size-1:
+            editor.cursorColor = 0
+      elif E_Left in newPressed:
+        editor.moveCursor(-1, 0)
+      elif E_Right in newPressed:
+        editor.moveCursor(+1, 0)
+          
+      elif E_A in pressed:
         editor[editor.cursorX, editor.cursorY] = editor.cursorColor
 
       if E_ScrollUp in instant:
-        editor.cursorY = min(editor.cursorY + 1, editor.H - 1)
+        if E_Right in pressed or E_Left in pressed:
+          editor.moveCursor(+1, 0)
+        else:
+          editor.moveCursor(0, -1)
       elif E_ScrollDown in instant:
-        editor.cursorY = max(editor.cursorY - 1, 0)
+        if E_Right in pressed or E_Left in pressed:
+          editor.moveCursor(-1, 0)
+        else:
+          editor.moveCursor(0, +1)
       if E_ScrollRight in instant:
-        editor.cursorX = min(editor.cursorX + 1, editor.W - 1)
+        editor.moveCursor(+1, 0)
       elif E_ScrollLeft in instant:
-        editor.cursorX = max(editor.cursorX - 1, 0)
+        editor.moveCursor(-1, 0)
     of pickerUI:
       if E_ScrollUp in instant:
-        # TODO: 
-        editor.colorPicker.changeValue(0.05)
+        if E_Right in pressed or E_Left in pressed:
+          movePickerCursor(+2, 0)
+        elif E_Up in pressed or E_Down in pressed:
+          movePickerCursor(0, -2)
+        else:
+          changePickerValue(valueStep)
       elif E_ScrollDown in instant:
-        editor.colorPicker.changeValue(-0.05)
-      if E_ScrollRight in instant:
-        editor.cursorX = min(editor.cursorX + 1, editor.W - 1)
-      elif E_ScrollLeft in instant:
-        editor.cursorX = max(editor.cursorX - 1, 0)
+        if E_Right in pressed or E_Left in pressed:
+          movePickerCursor(-2, 0)
+        elif E_Up in pressed or E_Down in pressed:
+          movePickerCursor(0, +2)
+        else:
+          changePickerValue(-valueStep)

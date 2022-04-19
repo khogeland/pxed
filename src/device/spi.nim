@@ -36,16 +36,6 @@ proc writeSpiBytes*(dev: SpiDev, data: openArray[uint8]) =
   trans.trn.tx_buffer = unsafeAddr data[0]
   transmit(trans)
 
-proc writeSpiBytes*(dev: SpiDev, data: openArray[uint16]) =
-  if len(data) == 0:
-    return
-  var trans = new(SpiTrans)
-  trans.dev = dev
-  #trans.tx_data = data.toSeq()
-  trans.trn.length = 16 * uint32(len(data))
-  trans.trn.tx_buffer = unsafeAddr data[0]
-  transmit(trans)
-
 proc writeSpi*(dev: SpiDev, length: uint, data: pointer) =
   var trans = new(SpiTrans)
   trans.dev = dev
@@ -58,13 +48,15 @@ proc sendCommand*(dev: SpiDev, cmd: uint8) =
   check gpio_set_level(PIN_DC, 0)
   writeSpiBytes(dev, @[cmd])
 
-proc sendData*(dev: SpiDev, data: openArray[uint16]) =
-  check gpio_set_level(PIN_DC, 1)
-  writeSpiBytes(dev, data)
+#proc sendCommand*(dev: SpiDev, cmd: openArray[uint8]) =
+  #check gpio_set_level(PIN_DC, 0)
+  #writeSpiBytes(dev, cmd[0..1])
+  #check gpio_set_level(PIN_DC, 1)
+  #writeSpiBytes(dev, cmd[1..^1])
 
-proc sendData*(dev: SpiDev, data: openArray[uint8]) =
-  check gpio_set_level(PIN_DC, 1)
-  writeSpiBytes(dev, data)
+#proc sendData*(dev: SpiDev, data: openArray[uint8]) =
+  #check gpio_set_level(PIN_DC, 1)
+  #writeSpiBytes(dev, data)
 
 proc sendData*(dev: SpiDev, length: uint, data: pointer) =
   check gpio_set_level(PIN_DC, 1)

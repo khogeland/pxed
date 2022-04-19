@@ -19,6 +19,7 @@ requires "nesper >= 0.6.1"
 requires "vmath >= 1.0.9"
 requires "opengl >= 1.2.6"
 requires "staticglfw >= 4.1.3"
+requires "msgpack4nim >= 0.3.1"
 
 # includes nimble tasks for building Nim esp-idf projects
 include nesper/build_utils/tasks

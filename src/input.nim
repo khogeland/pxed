@@ -7,98 +7,107 @@ import nesper
 import tables
 import options
 import device/pins
+import constants
 #
 
 const
   TAG*: cstring = "input"
 
-type TBDirection* = enum
-  TB_Up
-  TB_Down
-  TB_Left
-  TB_Right
-
-type Button* = enum
-  TB_Center = PIN_TB_BUTTON
+type ScrollDirection* = enum
+  ScrollUp, ScrollDown
 
 type ButtonEventType* = enum
   ButtonPressed
   ButtonReleased
 
 type InputEventType* = enum
-  TrackballEvent
+  ScrollEvent
   ButtonEvent
 
-type InputEvent* = object
-  case eventType*: InputEventType
-    of TrackballEvent:
-      direction*: TBDirection
-    of ButtonEvent:
-      buttonEventType*: ButtonEventType
-      button*: Button
+var scrollQueue: QueueHandle_t
+#var debugQueue: QueueHandle_t
 
-var inputQueue: QueueHandle_t
+var lastTicks: TickType_t
 
-var trackballTicks = {
-  TB_Up: TickType_t(0),
-  TB_Down: TickType_t(0),
-  TB_Left: TickType_t(0),
-  TB_Right: TickType_t(0),
-}.toTable
-
-var lastTrackballTick: TickType_t
-var lastButtonTick: TickType_t
-
-proc handleTrackballInterrupt(dptr: pointer) {.cdecl.} =
-  let direction = cast[TBDirection](dptr)
+proc handleScrollAInterrupt(unused: pointer) {.cdecl.} =
   let ticks = xTaskGetTickCountFromISR()
-  if ticks > trackballTicks[direction] + 1 and lastTrackballTick <= trackballTicks[direction]:
-    if ticks > lastButtonTick + 20:
-      let event = InputEvent(
-        eventType: TrackballEvent,
-        direction: direction
-      )
-      discard xQueueSend(inputQueue, unsafeAddr event, 0)
-  trackballTicks[direction] = ticks
-  lastTrackballTick = ticks
-
-proc handleButtonInterrupt(bptr: pointer) {.cdecl.} =
-  let button = cast[Button](bptr)
-  if button == TB_Center:
-    lastButtonTick = xTaskGetTickCountFromISR()
-  let event = InputEvent(
-    eventType: ButtonEvent,
-    buttonEventType: if getLevel(cast[gpio_num_t](button)): ButtonReleased else: ButtonPressed,
-    button: button,
-  )
-  discard xQueueSend(inputQueue, unsafeAddr event, 0)
-
+  if ticks > lastTicks+1:
+    delayMillis(1)
+    let scrollA = gpio_get_level(PIN_SCROLL_A)
+    let scrollB = gpio_get_level(PIN_SCROLL_B)
+    #let dbg = (scrollA shl 1) or scrollB
+    #discard xQueueSend(debugQueue, unsafeAddr ticks, 0)
+    let scroll = if scrollA == scrollB:
+      ScrollUp
+    else:
+      ScrollDown
+    discard xQueueSend(scrollQueue, unsafeAddr scroll, 0)
+    lastTicks = ticks
 
 proc initInput*() = 
   configure(
-    {PIN_TB_UP, PIN_TB_DOWN, PIN_TB_LEFT, PIN_TB_RIGHT},
-    mode = MODE_INPUT,
-    pull_up = false,
+    {PIN_X_0, PIN_X_1, PIN_X_2},
+    mode = MODE_OUTPUT,
+    pull_up = true,
     pull_down = false,
-    interrupt = INTR_ANYEDGE,
   )
   configure(
-    {PIN_TB_BUTTON},
+    {PIN_Y_0, PIN_Y_1, PIN_Y_2, PIN_SCROLL_B},
+    mode = MODE_INPUT,
+    pull_up = true,
+    pull_down = false,
+  )
+  configure(
+    {PIN_SCROLL_A},
     mode = MODE_INPUT,
     pull_up = true,
     pull_down = false,
     interrupt = INTR_ANYEDGE,
   )
-  inputQueue = xQueueCreate(30, sizeof(InputEvent))
-
+  #debugQueue = xQueueCreate(30, sizeof(TickType_t))
+  scrollQueue = xQueueCreate(30, sizeof(ScrollDirection))
   check gpio_install_isr_service(esp_intr_flags(0))
-  check gpio_isr_handler_add(PIN_TB_UP, handleTrackBallInterrupt, cast[pointer](TB_Up))
-  check gpio_isr_handler_add(PIN_TB_DOWN, handleTrackBallInterrupt, cast[pointer](TB_Down))
-  check gpio_isr_handler_add(PIN_TB_LEFT, handleTrackBallInterrupt, cast[pointer](TB_Left))
-  check gpio_isr_handler_add(PIN_TB_RIGHT, handleTrackBallInterrupt, cast[pointer](TB_Right))
-  check gpio_isr_handler_add(PIN_TB_BUTTON, handleButtonInterrupt, cast[pointer](TB_Center))
+  check gpio_isr_handler_add(PIN_SCROLL_A, handleScrollAInterrupt, nil)
 
-proc getNextInputEvent*(): Option[InputEvent] =
-  var event: InputEvent
-  if xQueueReceive(inputQueue, addr event, 0) != 0:
-    return some(event)
+proc getScrolls*(): set[ScrollDirection] =
+  var scroll: ScrollDirection
+  var tick: TickType_t
+  #while xQueueReceive(debugQueue, addr tick, 0) != 0:
+    #echo(tick)
+  while xQueueReceive(scrollQueue, addr scroll, 0) != 0:
+    result.incl(scroll)
+
+proc pollButtons*(): set[ButtonInput] =
+  check gpio_set_level(PIN_X_0, 0)
+  let x0y0 = gpio_get_level(PIN_Y_0)
+  let x0y1 = gpio_get_level(PIN_Y_1)
+  let x0y2 = gpio_get_level(PIN_Y_2)
+  check gpio_set_level(PIN_X_0, 1)
+  check gpio_set_level(PIN_X_1, 0)
+  let x1y0 = gpio_get_level(PIN_Y_0)
+  let x1y1 = gpio_get_level(PIN_Y_1)
+  let x1y2 = gpio_get_level(PIN_Y_2)
+  check gpio_set_level(PIN_X_1, 1)
+  check gpio_set_level(PIN_X_2, 0)
+  let x2y0 = gpio_get_level(PIN_Y_0)
+  let x2y1 = gpio_get_level(PIN_Y_1)
+  check gpio_set_level(PIN_X_2, 1)
+  #echo $x0y0 & " " & $x1y0 & " " & $x2y0
+  #echo $x0y1 & " " & $x1y1 & " " & $x2y1
+  #echo $x0y2 & " " & $x1y2
+  if x0y0 == 0:
+    result.incl(E_X)
+  if x0y1 == 0:
+    result.incl(E_Y)
+  if x0y2 == 0:
+    result.incl(E_A)
+  if x1y0 == 0:
+    result.incl(E_Left)
+  if x1y1 == 0:
+    result.incl(E_Up)
+  if x1y2 == 0:
+    result.incl(E_B)
+  if x2y0 == 0:
+    result.incl(E_Down)
+  if x2y1 == 0:
+    result.incl(E_Right)
