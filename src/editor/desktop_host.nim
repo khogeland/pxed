@@ -1,6 +1,7 @@
 import tables
 import opengl
 import staticglfw
+import framebuffer
 import constants
 import ../editor/editor
 #
@@ -13,17 +14,29 @@ var
   window: Window
 
 var ed = initEditor[32, 32]()
-var buffer: framebuffer
+var buffer: framebuffer18
+var glBuffer: array[SCREEN_HEIGHT * SCREEN_WIDTH * 3, uint8]
+for i in 0..len(glBuffer)-1:
+  glBuffer[i] = 0xFF
 
 ed[0, 0] = 1
 ed[31, 31] = 5
 ed[0, 31] = 3
 
+proc fbToGL*(fb: framebuffer18): array[SCREEN_HEIGHT*SCREEN_WIDTH*3, uint8] =
+  var i = 0
+  for pixel in fb:
+    result[i] = uint8(pixel.r)*4
+    result[i+1] = uint8(pixel.g)*4
+    result[i+2] = uint8(pixel.b)*4
+    i += 3
+
 proc display() =
   ed.draw(buffer)
-  var dataPtr = buffer[0].addr
+  glBuffer = fbToGl(buffer)
+  var dataPtr = glBuffer[0].addr
   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, GLsizei w, GLsizei h, GL_RGB,
-      GL_UNSIGNED_SHORT_5_6_5_REV, dataPtr)
+      GL_UNSIGNED_BYTE, dataPtr)
 
   # draw a quad over the whole screen
   glClear(GL_COLOR_BUFFER_BIT)
@@ -82,17 +95,15 @@ discard window.setScrollCallback(cast[ScrollFun](scrollProc))
 makeContextCurrent(window)
 loadExtensions()
 
-var dataPtr = buffer[0].addr
+var dataPtr = glBuffer[0].addr
 #glPixelStorei(GL_UNPACK_LSB_FIRST, 1)
 #glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
 glPixelStorei(GL_UNPACK_SWAP_BYTES, 1)
 
 glTexImage2D(GL_TEXTURE_2D, 0, 3, GLsizei w, GLsizei h, 0, GL_RGB,
-    GL_UNSIGNED_SHORT_5_6_5, dataPtr)
+    GL_UNSIGNED_BYTE, dataPtr)
 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP)
-glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
 glEnable(GL_TEXTURE_2D)
 
 while windowShouldClose(window) != 1:

@@ -1,39 +1,33 @@
 import math
 import constants
 import color
+import framebuffer
 import picker
 
 type Palette = object
   size: uint8
-  colors: array[256, RGB16Color]
+  colors: array[256, RGB18Color]
 
-proc rgb16(r, g, b: float): uint16 =
-  let r5: uint16 = (uint16(r * 255) shr 3)
-  let g6: uint16 = (uint16(g * 255) shr 2)
-  let b5: uint16 = uint16(b * 255) shr 3
-  return (r5 shl 11) or (g6 shl 5) or b5
+proc `[]`(p: Palette, idx: uint8): RGB18Color = p.colors[idx]
 
-proc `[]`(p: Palette, idx: uint8): uint16 = p.colors[idx]
+proc `[]=`(p: var Palette, idx: uint8, c: RGB18Color): void = p.colors[idx] = c
 
-proc `[]=`(p: var Palette, idx: uint8, c: uint16): void = p.colors[idx] = c
-
-const initialColors: array[256, uint16] = block:
-  var colors: array[256, uint16]
-  colors[0] = rgb16(0.1, 0.1, 0.1)
-  colors[1] = rgb16(0.5, 0.5, 0.5)
-  colors[2] = rgb16(0.9, 0.9, 0.9)
-  colors[3] = rgb16(0.8, 0.3, 0.1) # Warm red
-  colors[4] = rgb16(0.4, 0.15, 0.05) # Warm red dark
-  colors[5] = rgb16(0.2, 0.3, 0.8) # Cool blue
-  colors[6] = rgb16(0.1, 0.15, 0.4) # Cool blue dark
-  colors[7] = rgb16(0.3, 0.7, 0.3) # Green gray
-  colors[8] = rgb16(0.15, 0.35, 0.15) # Green gray dark
+const initialColors: array[256, RGB18Color] = block:
+  var colors: array[256, RGB18Color]
+  colors[0] = rgb(0.1, 0.1, 0.1)
+  colors[1] = rgb(0.5, 0.5, 0.5)
+  colors[2] = rgb(0.9, 0.9, 0.9)
+  colors[3] = rgb(0.8, 0.3, 0.1) # Warm red
+  colors[4] = rgb(0.4, 0.15, 0.05) # Warm red dark
+  colors[5] = rgb(0.2, 0.3, 0.8) # Cool blue
+  colors[6] = rgb(0.1, 0.15, 0.4) # Cool blue dark
+  colors[7] = rgb(0.3, 0.7, 0.3) # Green gray
+  colors[8] = rgb(0.15, 0.35, 0.15) # Green gray dark
   colors
 
 const
   initialPaletteSize: uint8 = 9
-  # 5-6-5 encoding limits us to 32 shades
-  valueStep = 1.0/32.0
+  valueStep = 1.0/64.0
 
 type UIType = enum
   editorUI, pickerUI
@@ -83,59 +77,31 @@ proc flood[W, H: static int](editor: var Editor[W, H], x, y: int, newColor: uint
       if iy < H-1:
         queue.add((ix, iy+1))
 
-# Editor W H, Factor
-proc draw*[W, H: static int](editor: Editor[W, H], buffer: var framebuffer) =
+proc draw*[W, H: static int](editor: Editor[W, H], buffer: var framebuffer18) =
   if editor.currentUI == pickerUI:
     drawPicker(buffer)
     return
   const f = SCREEN_HEIGHT div W
-  const tileByteWidth = f * 2
-  const skipY = tileByteWidth * W * f
+  const skipY = SCREEN_WIDTH * f
   var eX = -1
   var eY = -1
+  var color: RGB18Color
   let cursorColor = editor.palette[editor.cursorColor]
-  var color1: uint8
-  var color2: uint8
-  #var skip: int
-  for i in countup(0, BUFFER_LENGTH-1, 2):
-    #if skip > 0:
-      #skip -= 1
-      #continue
-    # only need to look up the color once per editor tile
-    if i mod tileByteWidth == 0:
+  for i in 0..len(buffer)-1:
+    if i mod f == 0:
       eX += 1
       if eX == W:
         eX = 0
       if i mod skipY == 0:
         eY += 1
-      let color: uint16 = if eX == editor.cursorX and eY == editor.cursorY:
+      color = if eX == editor.cursorX and eY == editor.cursorY:
           cursorColor
         else:
           editor.palette[editor[eX, eY]]
-      color1 = uint8(color shr 8)
-      color2 = uint8(color)
-      #if (buffer[i] == color1 and buffer[i+1] == color2):
-        #skip = f-1
-        #continue
+    buffer[i] = color
 
-    buffer[i] = color1
-    buffer[i+1] = color2
-
-  #let x1 = (editor.cursorX * f) - 1
-  #let y1 = (editor.cursorY * f) - 1
-  #let x2 = (editor.cursorX * f) + f
-  #let y2 = (editor.cursorY * f) + f
   let inverted = hsvToRgb(invertColor(rgbToHsv(cursorColor)))
   buffer[editor.cursorX * f, editor.cursorY * f] = inverted
-
-  #for x in x1..x2:
-    #for y in y1..y2:
-      #if x < 0 or x > W * f - 1 or y < 0 or y > H * f - 1:
-        #continue
-      #if y == y1 or y == y2:
-        #buffer[x, y] = inverted
-      #if x == x1 or x == x2:
-        #buffer[x, y] = inverted
     
 proc moveCursor[W, H](e: var Editor[W, H], x, y: int): void =
   e.cursorX = max(0, min(W-1, e.cursorX+x))
@@ -179,10 +145,12 @@ proc handleInput*[W, H](editor: var Editor[W, H], pressed: set[ButtonInput], ins
           editor.cursorColor -= 1
           if editor.cursorColor == 255:
             editor.cursorColor = editor.palette.size
+          return
         elif E_Right in newPressed or E_ScrollDown in instant:
           editor.cursorColor += 1
           if editor.cursorColor > editor.palette.size-1:
             editor.cursorColor = 0
+          return
       elif E_Left in newPressed:
         editor.moveCursor(-1, 0)
       elif E_Right in newPressed:

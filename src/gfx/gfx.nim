@@ -5,13 +5,14 @@ import constants
 import locks
 import nesper/timers
 import nesper/queues
+import framebuffer
 #
 
 const
   TAG*: cstring = "gfx"
 
 var bufferlock: Lock
-var buffer* {.guard: bufferlock.}: framebuffer
+var buffer* {.guard: bufferlock.}: framebuffer18
 initLock(bufferlock)
 template withBuffer*(body: untyped) =
   withLock bufferlock:
@@ -31,10 +32,10 @@ type GfxCommand = object
     of GfxShutdown:
       discard
 
-proc setBuffer*(new_buffer: framebuffer) = withBuffer:
+proc setBuffer*(new_buffer: framebuffer18) = withBuffer:
   buffer = new_buffer
 
-proc getBuffer*(): framebuffer = withBuffer:
+proc getBuffer*(): framebuffer18 = withBuffer:
   return buffer
 
 var hasShutdown = false
@@ -80,10 +81,7 @@ proc renderLoop*(): void =
   let bigscreen = init1351Spi(bus)
   bigscreen.initScreen()
   delayMillis(500)
-  var b: framebuffer
-  # wow that's a fucking suspicious number!
-  # (for some reason screen is misaligned, the start row address doesn't help)
-  #bigscreen.sendBuffer(128*96*8*2, addr b)
+  var b: framebuffer18
   while true:
     var cmd: GfxCommand
     var shouldShutdown = false
@@ -105,7 +103,8 @@ proc renderLoop*(): void =
         if buffer[i] != b[i]:
           update = true
           b = buffer
-    bigscreen.sendBuffer(SCREEN_HEIGHT * SCREEN_WIDTH * 8 * 2, addr b)
+    if update:
+      bigscreen.sendBuffer(SCREEN_HEIGHT * SCREEN_WIDTH * 24, addr b)
   bigscreen.shutdown()
   hasShutdown = true
 

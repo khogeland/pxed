@@ -3,3 +3,4 @@ nimcache/
 editor/desktop_host
 tags
 sdkconfig.old
+src/test

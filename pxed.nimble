@@ -16,7 +16,6 @@ bin = @[
 
 requires "nim >= 1.4.8"
 requires "nesper >= 0.6.1"
-requires "vmath >= 1.0.9"
 requires "opengl >= 1.2.6"
 requires "staticglfw >= 4.1.3"
 requires "msgpack4nim >= 0.3.1"

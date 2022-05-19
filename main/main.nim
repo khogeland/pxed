@@ -2,16 +2,14 @@ import constants
 import device/extra
 import device/storage
 import nesper
-import options
 import nesper/net_utils
 import nesper/timers
 import input
 import editor/editor
 import gfx/gfx
 import thread
-import tables
-import streams
 import msgpack4nim
+import framebuffer
 #
 
 
@@ -49,7 +47,7 @@ app_main():
   initStorage(filePrefix)
   initInput()
   # I think this size is in words?
-  createThreadWithStack[void](3000 + BUFFER_LENGTH, renderLoop)
+  createThreadWithStack[void](3000 + BUFFER_LENGTH*3, renderLoop)
   delayMillis(200) # calm down
   logi(TAG, "we didn't die!")
   var ed: Editor[32, 32]
@@ -124,9 +122,9 @@ app_main():
         elif E_ScrollDown in instant:
           settings.contrastB.adjust(-5)
       elif E_ScrollUp in instant:
-        settings.brightness = uint8(max(0, min(16, int(settings.brightness+1))))
+        settings.brightness = uint8(max(0, min(15, int(settings.brightness+1))))
       elif E_ScrollDown in instant:
-        settings.brightness = uint8(max(0, min(16, int(settings.brightness-1))))
+        settings.brightness = uint8(max(0, min(15, int(settings.brightness-1))))
       if settings != oldSettings:
         echo(settings)
         setBrightness(settings.brightness)

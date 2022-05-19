@@ -1,3 +1,4 @@
+# many thanks to Marcel Rodrigues for releasing gifenc to the public domain
 {.compile: "../vendor/gifenc/gifenc.c".}
 
 type
@@ -13,7 +14,6 @@ type
     back*: ptr uint8
     partial*: uint32
     buffer*: array[0xFF, uint8]
-
 
 proc ge_new_gif(fname: cstring; width: uint16; height: uint16;
                 palette: ptr uint8; depth: cint; bgindex: cint; loop: cint): ptr ge_GIF {.

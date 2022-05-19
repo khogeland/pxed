@@ -1,6 +1,7 @@
 import constants
 import color
 import math
+import framebuffer
 #import strutils
 
 const TAG*: cstring = "palette"
@@ -31,15 +32,15 @@ func radialColorAt(x, y: intOrFloat, value: float): HSVColor =
   return hsv(hue, distN, value)
 
 func findColor(hsv: HSVColor): (float, float) =
-  let dist = min(hsv.saturation*radius, 0.999)
+  let dist = min(hsv.saturation*radius, radius)
   if dist < 0.001:
     return centerPoint
   let angle = degToRad(hsv.hue) - PI
   result[0] = centerPoint[0] + dist*sin(angle)
   result[1] = centerPoint[1] + dist*cos(angle)
 
-const baseColorMap: framebuffer = static:
-  var result: framebuffer
+const baseColorMap: framebuffer18 = static:
+  var result: framebuffer18
   for y in 0..SCREEN_HEIGHT-1:
     for x in 0..SCREEN_WIDTH-1:
       let color = hsvToRgb(radialColorAt(x, y, 1.0))
@@ -48,55 +49,37 @@ const baseColorMap: framebuffer = static:
 
 var value: float
 var cursor: (float, float)
-#var colorMap: framebuffer
 
-proc initPicker*(color: RGB16Color) =
+proc initPicker*(color: RGB18Color) =
   let hsv = rgbToHsv(color)
   cursor = findColor(hsv)
   value = hsv.value
-  #colorMap = baseColorMap
 
 proc movePickerCursor*(x, y: int): void =
   cursor[0] = max(0, min(SCREEN_WIDTH-1, cursor[0]+x))
   cursor[1] = max(0, min(SCREEN_HEIGHT-1, cursor[1]+y))
 
-proc pickerCursorColor*(): RGB16Color =
+proc pickerCursorColor*(): RGB18Color =
   return hsvToRgb(radialColorAt(cursor[0], cursor[1], value))
 
-proc drawCircle(buffer: var framebuffer): void =
+proc drawCircle(buffer: var framebuffer18): void =
   let c = pickerCursorColor()
   const W = 32
   const f = SCREEN_WIDTH div W
-  const tileByteWidth = f * 2
-  const skipY = tileByteWidth * W * f
+  const skipY = SCREEN_WIDTH * f
   var eX = -1
   var eY = -1
-  var color1: uint8
-  var color2: uint8
-  for i in countup(0, BUFFER_LENGTH-1, 2):
-    if i mod tileByteWidth == 0:
+  var color: RGB18Color
+  for i in 0..len(buffer)-1:
+    if i mod f == 0:
       eX += 1
       if eX == W:
         eX = 0
       if i mod skipY == 0:
         eY += 1
       let baseColor = baseColorMap[eX * f, eY * f]
-      let color = if baseColor == 0: c else: adjustValue(baseColor, value)
-      color1 = uint8(color shr 8)
-      color2 = uint8(color)
-    buffer[i] = color1
-    buffer[i+1] = color2
-
-proc drawNotCircle(buffer: var framebuffer): void =
-  let c = pickerCursorColor()
-  for y in 0..SCREEN_HEIGHT-1:
-    for x in 0..SCREEN_WIDTH-1:
-      let dx = x-centerPoint[0]
-      let dy = y-centerPoint[1]
-      #another pretty typo
-      #if sqrt(dx^2 * dy^2) > radius:
-      if sqrt(dx^2 + dy^2) > radius:
-        buffer[x, y] = c
+      color = if baseColor == rgb(0,0,0): c else: adjustValue(baseColor, value)
+    buffer[i] = color
 
 proc changePickerValue*(by: float): void =
   value += by
@@ -104,20 +87,17 @@ proc changePickerValue*(by: float): void =
     value = 0.0
   elif value > 0.999:
     value = 1.0
-  #for y in 0..SCREEN_WIDTH-1:
-    #for x in 0..SCREEN_WIDTH-1:
-      #colorMap[x, y] = adjustValue(colorMap[x, y], value)
 
-proc drawCursor(buffer: var framebuffer) =
+proc drawCursor(buffer: var framebuffer18) =
   let cx = int(cursor[0])
   let cy = int(cursor[1])
   let color = pickerCursorColor()
-  let inverted = color xor 0xFFFF
+  let inverted = hsvToRgb(invertColor(rgbToHsv(color)))
   for sx in max(cx-2, 0)..min(cx+2, SCREEN_WIDTH-1):
     for sy in max(cy-2, 0)..min(cy+2, SCREEN_HEIGHT-1):
       buffer[sx, sy] = inverted
 
-proc drawPicker*(buffer: var framebuffer) =
+proc drawPicker*(buffer: var framebuffer18) =
   drawCircle(buffer)
   #drawNotCircle(picker, buffer)
   drawCursor(buffer)

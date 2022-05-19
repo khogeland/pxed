@@ -74,7 +74,7 @@ proc initScreen*(dev: SpiDev) = withSpiBus(dev):
   logi(TAG, "Initializing display")
   dev.sendCommand(CMD_SETREMAP)
   #TODO asrtarstidnied why my spi functions no work
-  var args: uint8 = 0b00100111
+  var args: uint8 = 0b10100111
   dev.sendData(8, addr args)
 
   dev.sendCommand(CMD_STARTLINE)
@@ -86,7 +86,7 @@ proc initScreen*(dev: SpiDev) = withSpiBus(dev):
   dev.sendData(8, addr args)
 
   dev.sendCommand(CMD_CLOCKDIV)
-  args = 0b11110001
+  args = 0b10110001
   dev.sendData(8, addr args)
 
   logi(TAG, "Display enabled")
