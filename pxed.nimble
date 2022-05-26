@@ -8,7 +8,7 @@ srcDir        = "src"
 
 bin = @[
     "main/main",
-    "editor/desktop_host"
+    "ui/desktop_host"
 ]
 
 

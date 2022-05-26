@@ -1,6 +1,8 @@
 import constants
 
 type
+  BGRA32Color* = object
+    b*, g*, r*, a*: uint8
   RGB18Color* = object
     r*, g*, b*: u6
   HSVColor* = object
@@ -13,6 +15,19 @@ func rgb*(r, g, b: float): RGB18Color = RGB18Color(
   b: uint8(b*63.9).u6)
 func hsv*(h, s, v: float): HSVColor = HSVColor(hue: h, saturation: s, value: v)
 
+func rgb*(bgra: BGRA32Color): RGB18Color = RGB18Color(
+  r: (bgra.r shr 2).u6,
+  g: (bgra.g shr 2).u6,
+  b: (bgra.b shr 2).u6,
+)
+
+func bgra*(rgb: RGB18Color): BGRA32Color = BGRA32Color(
+  b: (rgb.b.uint8 shl 2),
+  g: (rgb.g.uint8 shl 2),
+  r: (rgb.r.uint8 shl 2),
+)
+
+
 func adjustValue*(rgb: RGB18Color, value: float): RGB18Color =
   let v = value * 63.9
   if value == 0:
@@ -20,9 +35,9 @@ func adjustValue*(rgb: RGB18Color, value: float): RGB18Color =
   # TODO: organization red flag, this is for the picker color map mask
   if max(rgb.r, max(rgb.g, rgb.b)) == 0.u6:
     return rgb(0,0,0)
-  let r = float(rgb.r)
-  let g = float(rgb.g)
-  let b = float(rgb.b)
+  let r = rgb.r.float
+  let g = rgb.g.float
+  let b = rgb.b.float
 
   if r >= g and r >= b:
     return rgb(u6(v), u6((g/r) * v), u6((b/r) * v))
@@ -39,9 +54,9 @@ func invertColor*(hsv: HSVColor): HSVColor =
   result.value = if hsv.value > 0.5: hsv.value-0.5 else: hsv.value+0.5  
 
 func rgbToHsv*(rgb: RGB18Color): HSVColor =
-  let r = float(rgb.r)/64.0
-  let g = float(rgb.g)/64.0
-  let b = float(rgb.b)/64.0
+  let r = rgb.r.float/63.9
+  let g = rgb.g.float/63.9
+  let b = rgb.b.float/63.9
   let v = max(r, max(g, b))
   if v < 0.0001:
     return HSVColor(

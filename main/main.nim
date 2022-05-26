@@ -10,16 +10,6 @@ import gfx/gfx
 import thread
 import msgpack4nim
 import framebuffer
-#
-
-
-#when defined(ESP32_ETHERNET):
-  #import setup_eth
-#else:
-  #import setup_wifi
-
-# const CONFIG_EXAMPLE_WIFI_SSID = getEnv("WIFI_SSID")
-# const CONFIG_EXAMPLE_WIFI_PASSWORD = getEnv("WIFI_PASSWORD")
 
 type DeviceSettings = object
   brightness: uint8
@@ -29,7 +19,6 @@ type DeviceSettings = object
 
 const
   TAG*: cstring = "main"
-  filePrefix = "/data"
   editorFile = "/data/ed_state"
   settingsFile = "/data/settings"
   defaultSettings = DeviceSettings(
@@ -44,7 +33,7 @@ proc adjust*(a: var uint8, by: int): void = a = uint8(max(0, min(255, int(a) + b
 app_main():
   logi(TAG, "hello!")
   delayMillis(200) # calm down
-  initStorage(filePrefix)
+  initStorage("/data")
   initInput()
   # I think this size is in words?
   createThreadWithStack[void](3000 + BUFFER_LENGTH*3, renderLoop)
@@ -81,7 +70,7 @@ app_main():
 
   #var currentlyPressed: set[ButtonInput]
   while true:
-    # TODO this is bad, framerate locked
+    # TODO: input task
     delayMillis(10)
     let buttons = pollButtons()
     var instant: set[InstantInput]

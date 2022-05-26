@@ -1,6 +1,9 @@
 build/
 nimcache/
-editor/desktop_host
-tags
+desktop_host
 sdkconfig.old
 src/test
+.DS_Store
+*.ase
+*.aseprite
+tags

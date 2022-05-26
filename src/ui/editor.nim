@@ -3,14 +3,15 @@ import constants
 import color
 import framebuffer
 import picker
+import gfx/sprites
+import gfx/image
 
-type Palette = object
-  size: uint8
-  colors: array[256, RGB18Color]
+#type Palette = object
+  #colors: array[256, RGB18Color]
 
-proc `[]`(p: Palette, idx: uint8): RGB18Color = p.colors[idx]
+#proc `[]`(p: Palette, idx: uint8): RGB18Color = p.colors[idx]
 
-proc `[]=`(p: var Palette, idx: uint8, c: RGB18Color): void = p.colors[idx] = c
+#proc `[]=`(p: var Palette, idx: uint8, c: RGB18Color): void = p.colors[idx] = c
 
 const initialColors: array[256, RGB18Color] = block:
   var colors: array[256, RGB18Color]
@@ -26,7 +27,6 @@ const initialColors: array[256, RGB18Color] = block:
   colors
 
 const
-  initialPaletteSize: uint8 = 9
   valueStep = 1.0/64.0
 
 type UIType = enum
@@ -37,27 +37,32 @@ type Editor*[W, H: static int] = object
   cursorY*: int
   cursorColor: uint8
   lastPressed: set[ButtonInput]
-  contents: array[W, array[H, uint8]]
-  palette: Palette
+  image: RGB18Image
+  #contents: array[W * H, uint8]
+  #palette: Palette
   currentUI: UIType
 
 proc initEditor*[W, H: static int](): Editor[W, H] =
-  let palette = Palette(
-      colors: initialColors,
-      size: initialPaletteSize,
-    )
+  #let palette = Palette(
+      #colors: initialColors,
+    #)
+  let image = RGB18Image(w: W, h: H, palette: initialColors, contents: newSeq[uint8](W*H))
   return Editor[W, H](
     cursorColor: 0,
-    palette: palette,
     currentUI: editorUI,
+    image: image,
   )
 
-proc `[]`*(editor: Editor, x, y: int): uint8 = editor.contents[x][y]
-proc `[]=`*(editor: var Editor, x, y: int, c: uint8) = editor.contents[x][y] = c
+proc `[]`*[W, H: static int](editor: Editor[W, H], x, y: int): uint8 = editor.image.contents[(y * W) + x]
+proc `[]=`*[W, H: static int](editor: var Editor[W, H], x, y: int, c: uint8) = editor.image.contents[(y * W) + x] = c
 
-# TODO
-proc saveState*(editor: Editor): void =
-  discard
+proc loadTGA*[W, H: static int](ed: var Editor[W, H], tga: TGA) =
+  if W != tga.w or H != tga.h:
+    raise newException(ValueError, "cannot load TGA, wrong dimensions")
+  ed.image = tga.img18
+
+proc toTGA*[W, H: static int](ed: Editor[W, H]): TGA =
+  return ed.image.tga
 
 proc flood[W, H: static int](editor: var Editor[W, H], x, y: int, newColor: uint8): void =
   let oldColor = editor[x, y]
@@ -80,42 +85,60 @@ proc flood[W, H: static int](editor: var Editor[W, H], x, y: int, newColor: uint
 proc draw*[W, H: static int](editor: Editor[W, H], buffer: var framebuffer18) =
   if editor.currentUI == pickerUI:
     drawPicker(buffer)
-    return
-  const f = SCREEN_HEIGHT div W
-  const skipY = SCREEN_WIDTH * f
-  var eX = -1
-  var eY = -1
-  var color: RGB18Color
-  let cursorColor = editor.palette[editor.cursorColor]
-  for i in 0..len(buffer)-1:
-    if i mod f == 0:
-      eX += 1
-      if eX == W:
-        eX = 0
-      if i mod skipY == 0:
-        eY += 1
-      color = if eX == editor.cursorX and eY == editor.cursorY:
-          cursorColor
-        else:
-          editor.palette[editor[eX, eY]]
-    buffer[i] = color
+  else:
+    const f = SCREEN_HEIGHT div W
+    const skipY = SCREEN_WIDTH * f
+    var eX = -1
+    var eY = -1
+    var color: RGB18Color
+    let cursorColor = editor.image.palette[editor.cursorColor]
+    for i in 0..len(buffer)-1:
+      if i mod f == 0:
+        eX += 1
+        if eX == W:
+          eX = 0
+        if i mod skipY == 0:
+          eY += 1
+        color = if eX == editor.cursorX and eY == editor.cursorY:
+            cursorColor
+          else:
+            editor.image.palette[editor[eX, eY]]
+      buffer[i] = color
+    let inverted = hsvToRgb(invertColor(rgbToHsv(cursorColor)))
+    buffer[editor.cursorX * f, editor.cursorY * f] = inverted
 
-  let inverted = hsvToRgb(invertColor(rgbToHsv(cursorColor)))
-  buffer[editor.cursorX * f, editor.cursorY * f] = inverted
-    
 proc moveCursor[W, H](e: var Editor[W, H], x, y: int): void =
   e.cursorX = max(0, min(W-1, e.cursorX+x))
   e.cursorY = max(0, min(H-1, e.cursorY+y))
 
+var paletteWheel = loadImage(90, 108, 2, "palette.tga")
+let paletteId = paletteWheel.palette
+paletteWheel.show()
+
+proc updatePalette(ed: Editor): void =
+  paletteWheel.show()
+  var turned: array[256, RGB18Color]
+  const centerOffset = -12
+  for i in 0..255:
+    # mod doesn't work as expected with negative numbers?
+    let ti = (i + ed.cursorColor.int + centerOffset + 256) mod 256
+    turned[i] = ed.image.palette[ti]
+  updatePalette(paletteId, turned)
+
+proc hideEditorSprites(): void =
+  discard
+  paletteWheel.hide()
 
 proc handleInput*[W, H](editor: var Editor[W, H], pressed: set[ButtonInput], instant: set[InstantInput]) =
   var newPressed = pressed
   newPressed.excl(editor.lastPressed)
   editor.lastPressed = pressed
   if E_Y in pressed:
+    if editor.currentUI == editorUI:
+      hideEditorSprites()
     editor.currentUI = pickerUI
     if E_Y in newPressed:
-      initPicker(editor.palette[editor.cursorColor])
+      initPicker(editor.image.palette[editor.cursorColor])
     else:
       if E_Up in newPressed:
         movePickerCursor(0, +1)
@@ -126,11 +149,14 @@ proc handleInput*[W, H](editor: var Editor[W, H], pressed: set[ButtonInput], ins
       elif E_Right in newPressed:
         movePickerCursor(+1, 0)
 
-    editor.palette[editor.cursorColor] = pickerCursorColor()
+    editor.image.palette[editor.cursorColor] = pickerCursorColor()
   else:
+    if editor.currentUI == pickerUI:
+      closePicker()
     editor.currentUI = editorUI
   case editor.currentUI:
     of editorUI:
+      paletteWheel.hide()
       if E_Up in newPressed:
         editor.moveCursor(0, +1)
       elif E_Down in newPressed:
@@ -138,18 +164,21 @@ proc handleInput*[W, H](editor: var Editor[W, H], pressed: set[ButtonInput], ins
       elif E_B in pressed:
         if E_X in newPressed: # flood fill, hard to press
           editor.flood(editor.cursorX, editor.cursorY, editor.cursorColor)
-        elif E_Y in newPressed: # eyedropper
+        elif E_A in newPressed: # eyedropper
           editor.cursorColor = editor[editor.cursorX, editor.cursorY]
       elif E_X in pressed:
+        paletteWheel.show()
         if E_Left in newPressed or E_ScrollUp in instant:
           editor.cursorColor -= 1
-          if editor.cursorColor == 255:
-            editor.cursorColor = editor.palette.size
+          #if editor.cursorColor == 255:
+            #editor.cursorColor = editor.palette.size
+          editor.updatePalette()
           return
         elif E_Right in newPressed or E_ScrollDown in instant:
           editor.cursorColor += 1
-          if editor.cursorColor > editor.palette.size-1:
-            editor.cursorColor = 0
+          #if editor.cursorColor > editor.palette.size-1:
+            #editor.cursorColor = 0
+          editor.updatePalette()
           return
       elif E_Left in newPressed:
         editor.moveCursor(-1, 0)

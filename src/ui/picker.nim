@@ -2,6 +2,7 @@ import constants
 import color
 import math
 import framebuffer
+import gfx/sprites
 #import strutils
 
 const TAG*: cstring = "palette"
@@ -49,15 +50,26 @@ const baseColorMap: framebuffer18 = static:
 
 var value: float
 var cursor: (float, float)
+var pointerSprite = loadImage(10, 10, 2, "glass.tga")
+pointerSprite.hide()
+
+proc updatePointer(): void =
+  pointerSprite.move(int(cursor[0]-8), int(cursor[1]-8))
 
 proc initPicker*(color: RGB18Color) =
+  pointerSprite.show()
   let hsv = rgbToHsv(color)
   cursor = findColor(hsv)
+  updatePointer()
   value = hsv.value
+
+proc closePicker*() =
+  pointerSprite.hide()
 
 proc movePickerCursor*(x, y: int): void =
   cursor[0] = max(0, min(SCREEN_WIDTH-1, cursor[0]+x))
   cursor[1] = max(0, min(SCREEN_HEIGHT-1, cursor[1]+y))
+  updatePointer()
 
 proc pickerCursorColor*(): RGB18Color =
   return hsvToRgb(radialColorAt(cursor[0], cursor[1], value))
@@ -92,10 +104,10 @@ proc drawCursor(buffer: var framebuffer18) =
   let cx = int(cursor[0])
   let cy = int(cursor[1])
   let color = pickerCursorColor()
-  let inverted = hsvToRgb(invertColor(rgbToHsv(color)))
-  for sx in max(cx-2, 0)..min(cx+2, SCREEN_WIDTH-1):
-    for sy in max(cy-2, 0)..min(cy+2, SCREEN_HEIGHT-1):
-      buffer[sx, sy] = inverted
+  #let inverted = hsvToRgb(invertColor(rgbToHsv(color)))
+  for sx in max(cx-4, 0)..min(cx+4, SCREEN_WIDTH-1):
+    for sy in max(cy-4, 0)..min(cy+4, SCREEN_HEIGHT-1):
+      buffer[sx, sy] = color
 
 proc drawPicker*(buffer: var framebuffer18) =
   drawCircle(buffer)

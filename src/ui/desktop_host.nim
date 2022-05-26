@@ -1,10 +1,14 @@
+import files
+import gfx/sprites
+import gfx/image
 import tables
 import opengl
 import staticglfw
 import framebuffer
 import constants
-import ../editor/editor
-#
+import ui/editor
+import ui/browser
+import ui/boss
 
 let
   w: int32 = 128
@@ -32,7 +36,8 @@ proc fbToGL*(fb: framebuffer18): array[SCREEN_HEIGHT*SCREEN_WIDTH*3, uint8] =
     i += 3
 
 proc display() =
-  ed.draw(buffer)
+  drawUI(buffer)
+  #ed.draw(buffer)
   glBuffer = fbToGl(buffer)
   var dataPtr = glBuffer[0].addr
   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, GLsizei w, GLsizei h, GL_RGB,
@@ -98,7 +103,7 @@ loadExtensions()
 var dataPtr = glBuffer[0].addr
 #glPixelStorei(GL_UNPACK_LSB_FIRST, 1)
 #glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-glPixelStorei(GL_UNPACK_SWAP_BYTES, 1)
+#glPixelStorei(GL_UNPACK_SWAP_BYTES, 1)
 
 glTexImage2D(GL_TEXTURE_2D, 0, 3, GLsizei w, GLsizei h, 0, GL_RGB,
     GL_UNSIGNED_BYTE, dataPtr)
@@ -106,8 +111,22 @@ glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
 glEnable(GL_TEXTURE_2D)
 
+#let pointerSprite = loadImage(20, 20, 2, "resources/pointer.tga")
+
+var st: FileStream
+if openStorageStream("current_image.tga", st):
+  try:
+    ed.loadTGA(readTGA(st))
+  finally:
+    st.close()
+
 while windowShouldClose(window) != 1:
   instant = {}
   pollEvents()
   ed.handleInput(pressed, instant)
+  let st = openStorageStream("current_image.tga", fmWrite)
+  try:
+    st.writeTGA(ed.toTGA())
+  finally:
+    st.close()
   display()
