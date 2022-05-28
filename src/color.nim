@@ -25,6 +25,7 @@ func bgra*(rgb: RGB18Color): BGRA32Color = BGRA32Color(
   b: (rgb.b.uint8 shl 2),
   g: (rgb.g.uint8 shl 2),
   r: (rgb.r.uint8 shl 2),
+  a: 0xFF,
 )
 
 

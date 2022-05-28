@@ -37,6 +37,9 @@ proc openStorageStream*(path: string, st: var FileStream, mode: FileMode = fmRea
 proc openStorageStream*(path: string, mode: FileMode = fmRead, bufSize: int = -1): FileStream =
   return openFileStream(storagePrefix & path, mode, bufSize)
 
+proc resolveStoragePath*(path: string): string =
+  return storagePrefix & path
+
 iterator listStorageDir*(path: string): string =
   let realPath = storagePrefix & path
   createDir(realPath)

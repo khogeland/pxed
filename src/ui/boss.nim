@@ -5,18 +5,13 @@ import framebuffer
 import editor
 
 type
-  Editor32 = Editor[32,32]
-  Editor64 = Editor[64,64]
   ViewType = enum
-    Editor32View,
-    Editor64View,
+    EditorView,
     BrowserView
   View = object
     case kind: ViewType
-      of Editor32View:
-        editor32: Editor32
-      of Editor64View:
-        editor64: Editor64
+      of EditorView:
+        editor: Editor
       of BrowserView:
         browser: Browser
 
@@ -24,23 +19,29 @@ var view = View(
   kind: BrowserView,
   browser: initBrowser(),
 )
-showBrowserSprites()
 
 proc handleInput*(pressed: set[ButtonInput], instant: set[InstantInput]) =
   case view.kind
-    of Editor32View:
-      view.editor32.handleInput(pressed, instant)
-    of Editor64View:
-      view.editor64.handleInput(pressed, instant)
+    of EditorView:
+      if view.editor.handleInput(pressed, instant):
+        view.editor.saveImage()
+        view = View(
+          kind: BrowserView,
+          browser: initBrowser(),
+        )
     of BrowserView:
-      view.browser.handleInput(pressed, instant)
+      if view.browser.handleInput(pressed, instant):
+        let preview = view.browser.getSelection()
+        # TODO inefficient, reloads image
+        view = View(
+          kind: EditorView,
+          editor: initEditor(preview.path),
+        )
 
 proc drawUI*(buffer: var framebuffer18) =
   case view.kind
-    of Editor32View:
-      view.editor32.draw(buffer)
-    of Editor64View:
-      view.editor64.draw(buffer)
+    of EditorView:
+      view.editor.draw(buffer)
     of BrowserView:
       view.browser.draw(buffer)
   drawSprites(buffer)

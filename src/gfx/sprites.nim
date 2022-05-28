@@ -52,7 +52,7 @@ proc addSprite*(x, y, w, h, factor, palette: int, contents: seq[uint8]): Sprite 
 proc loadImage*(x, y, factor: int, path: string): Sprite =
   let img18 = readTGA(openResourceStream("sprites/" & path)).img18
   let palette = addPalette(img18.palette)
-  return addSprite(x, y, img18.w, img18.w, factor, palette, img18.contents)
+  return addSprite(x, y, img18.w, img18.h, factor, palette, img18.contents)
 
 proc move*(s: var Sprite, x, y: int): void =
   s.x = x

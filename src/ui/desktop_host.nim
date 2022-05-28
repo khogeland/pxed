@@ -1,13 +1,13 @@
 import files
-import gfx/sprites
+#import gfx/sprites
 import gfx/image
 import tables
 import opengl
 import staticglfw
 import framebuffer
 import constants
-import ui/editor
-import ui/browser
+#import ui/editor
+#import ui/browser
 import ui/boss
 
 let
@@ -17,15 +17,15 @@ let
 var
   window: Window
 
-var ed = initEditor[32, 32]()
+#var ed = initEditor[32, 32]()
 var buffer: framebuffer18
 var glBuffer: array[SCREEN_HEIGHT * SCREEN_WIDTH * 3, uint8]
 for i in 0..len(glBuffer)-1:
   glBuffer[i] = 0xFF
 
-ed[0, 0] = 1
-ed[31, 31] = 5
-ed[0, 31] = 3
+#ed[0, 0] = 1
+#ed[31, 31] = 5
+#ed[0, 31] = 3
 
 proc fbToGL*(fb: framebuffer18): array[SCREEN_HEIGHT*SCREEN_WIDTH*3, uint8] =
   var i = 0
@@ -113,20 +113,26 @@ glEnable(GL_TEXTURE_2D)
 
 #let pointerSprite = loadImage(20, 20, 2, "resources/pointer.tga")
 
-var st: FileStream
-if openStorageStream("current_image.tga", st):
-  try:
-    ed.loadTGA(readTGA(st))
-  finally:
-    st.close()
+#var st: FileStream
+#if openStorageStream("current_image.tga", st):
+  #try:
+    #ed.loadTGA(readTGA(st))
+  #finally:
+    #st.close()
 
-while windowShouldClose(window) != 1:
-  instant = {}
-  pollEvents()
-  ed.handleInput(pressed, instant)
-  let st = openStorageStream("current_image.tga", fmWrite)
-  try:
-    st.writeTGA(ed.toTGA())
-  finally:
-    st.close()
-  display()
+try:
+  while windowShouldClose(window) != 1:
+    instant = {}
+    pollEvents()
+    handleInput(pressed, instant)
+    #let st = openStorageStream("current_image.tga", fmWrite)
+    #try:
+      #st.writeTGA(ed.toTGA())
+    #finally:
+      #st.close()
+    display()
+except:
+  # I have no idea why Nim refuses to print stack traces, so...
+  let e = getCurrentException()
+  echo e.msg
+  echo e.getStackTrace()
