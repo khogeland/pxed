@@ -7,6 +7,8 @@ import gfx/sprites
 import framebuffer
 import editor
 
+#TODO open to last view
+
 type
   ViewType = enum
     EditorView,

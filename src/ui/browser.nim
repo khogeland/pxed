@@ -8,6 +8,8 @@ import framebuffer
 import gfx/image
 import gfx/sprites
 
+#TODO remember position in browser
+
 type
   Preview* = object
     index: int
