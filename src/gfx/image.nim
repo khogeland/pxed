@@ -1,9 +1,16 @@
 import color
 import streams
 
+# TODO run-length encoding
 type
+  TGAPalette = object
+    case alpha: bool
+    of true:
+      palette32: seq[BGRA32Color]
+    of false:
+      palette24: seq[BGR24Color]
   TGA* = object
-    palette*: seq[BGRA32Color]
+    palette*: TGAPalette
     data*: seq[uint8]
     w*, h*: uint16
     topOrigin: bool
@@ -41,10 +48,11 @@ iterator iterDataIdx*(tga: TGA): (int, int) =
 proc tga*(img18: RGB18Image): TGA =
   result.w = img18.w.uint16
   result.h = img18.h.uint16
-  result.palette = newSeq[BGRA32Color](256)
+  result.palette.alpha = false
+  result.palette.palette24 = newSeq[BGR24Color](256)
   result.data = newSeq[uint8](img18.w * img18.h)
   for i in 0..len(img18.palette)-1:
-    result.palette[i] = img18.palette[i].bgra
+    result.palette.palette24[i] = img18.palette[i].bgr
   for i in 0..(img18.w * img18.h)-1:
     result.data[i] = img18.contents[i]
 
@@ -52,8 +60,12 @@ proc img18*(tga: TGA): RGB18Image =
   result.w = tga.w.int
   result.h = tga.h.int
   result.contents = newSeq[uint8](result.w * result.h)
-  for i in 0..len(tga.palette)-1:
-    result.palette[i] = tga.palette[i].rgb
+  if tga.palette.alpha:
+    for i in 0..len(tga.palette.palette32)-1:
+      result.palette[i] = tga.palette.palette32[i].rgb
+  else:
+    for i in 0..len(tga.palette.palette24)-1:
+      result.palette[i] = tga.palette.palette24[i].rgb
   for i1, i2 in tga.iterDataIdx():
     result.contents[i1] = tga.data[i2]
 
@@ -67,7 +79,7 @@ proc writeTGA*(st: FileStream, tga: TGA): void =
     imageType: 1,
     mapIdx: 0,
     mapLen: 256,
-    mapEntryBits: 32, #TODO: really should just be 24
+    mapEntryBits: if tga.palette.alpha: 32 else: 24,
     xOrigin: 0,
     yOrigin: 0,
     w: tga.w,
@@ -76,8 +88,12 @@ proc writeTGA*(st: FileStream, tga: TGA): void =
     descriptor: 0, # always write with bottom origin
   )
   st.write(header)
-  for color in tga.palette:
-    st.write(color)
+  if tga.palette.alpha:
+    for color in tga.palette.palette32:
+      st.write(color)
+  else:
+    for color in tga.palette.palette24:
+      st.write(color)
   if tga.topOrigin: # we gotta flip it!!!!
     for i in 0..len(tga.data)-1:
       let tx = i mod tga.w.int
@@ -98,11 +114,11 @@ proc readTGA*(st: FileStream): TGA =
   var header: TGAHeader
   st.read(header)
   if unlikely(header.colorMapType != 1):
-    tgaErr("missing color map")
+    tgaErr("incorrect color map type: " & $header.colorMapType)
   if unlikely(header.imageType != 1):
     tgaErr("image should be uncompressed and indexed")
-  if unlikely(header.mapEntryBits != 32):
-    tgaErr("expected 32 bits per color")
+  if unlikely(header.mapEntryBits != 32 and header.mapEntryBits != 24):
+    tgaErr("unsupported color format")
   if unlikely(header.mapLen > 256):
     tgaErr("color map too large")
   if unlikely(header.bpp != 8):
@@ -114,10 +130,18 @@ proc readTGA*(st: FileStream): TGA =
   if header.idLen != 0:
     for _ in 1'u8..header.idLen:
       discard st.readUint8()
-  for _ in 1'u16..header.mapLen:
-    var c: BGRA32Color
-    st.read(c)
-    result.palette.add(c)
+  if header.mapEntryBits == 32:
+    result.palette = TGAPalette(alpha: true)
+    for _ in 1'u16..header.mapLen:
+      var c: BGRA32Color
+      st.read(c)
+      result.palette.palette32.add(c)
+  else:
+    result.palette = TGAPalette(alpha: false)
+    for _ in 1'u16..header.mapLen:
+      var c: BGR24Color
+      st.read(c)
+      result.palette.palette24.add(c)
   let size = header.w * header.h
   for _ in 1'u16..size:
     result.data.add(st.readUint8())

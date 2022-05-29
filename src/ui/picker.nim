@@ -67,6 +67,7 @@ proc closePicker*() =
   pointerSprite.hide()
 
 proc movePickerCursor*(x, y: int): void =
+  #TODO constrain to color wheel
   cursor[0] = max(0, min(SCREEN_WIDTH-1, cursor[0]+x))
   cursor[1] = max(0, min(SCREEN_HEIGHT-1, cursor[1]+y))
   updatePointer()

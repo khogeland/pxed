@@ -1,4 +1,4 @@
-import os
+import times
 import constants
 import color
 import framebuffer
@@ -6,17 +6,12 @@ import picker
 import gfx/sprites
 import gfx/image
 
+#TODO: palette rearrangement, eyedrop to palette
+
 const initialColors: array[256, RGB18Color] = block:
   var colors: array[256, RGB18Color]
   colors[0] = rgb(0.1, 0.1, 0.1)
-  colors[1] = rgb(0.5, 0.5, 0.5)
-  colors[2] = rgb(0.9, 0.9, 0.9)
-  colors[3] = rgb(0.8, 0.3, 0.1) # Warm red
-  colors[4] = rgb(0.4, 0.15, 0.05) # Warm red dark
-  colors[5] = rgb(0.2, 0.3, 0.8) # Cool blue
-  colors[6] = rgb(0.1, 0.15, 0.4) # Cool blue dark
-  colors[7] = rgb(0.3, 0.7, 0.3) # Green gray
-  colors[8] = rgb(0.15, 0.35, 0.15) # Green gray dark
+  colors[1] = rgb(0.8, 0.8, 0.8)
   colors
 
 const
@@ -36,7 +31,17 @@ type Editor* = object
   #palette: Palette
   currentUI: UIType
   path: string
+  saveWaiting: bool
+  saveTime: float
 
+const saveDelay = 2.0
+var paletteBack = loadImage(86, 104, 2, "paletteback.tga")
+var paletteBacks = @[
+  loadImage(86, 104, 2, "paletteback1.tga"),
+  loadImage(86, 104, 2, "paletteback2.tga"),
+  loadImage(86, 104, 2, "paletteback3.tga"),
+  loadImage(86, 104, 2, "paletteback4.tga"),
+]
 var paletteWheel = loadImage(90, 108, 2, "palette.tga")
 let paletteId = paletteWheel.palette
 
@@ -59,21 +64,42 @@ proc updatePalette(ed: Editor): void =
     turned[i] = ed.image.palette[ti]
   updatePalette(paletteId, turned)
 
+proc setup(ed: var Editor) =
+  ed.updatePalette()
+  ed.cursorX = ed.w div 2
+  ed.cursorY = ed.h div 2
+
 proc initEditor*(path: string): Editor =
   result = Editor(
-    cursorColor: 0,
+    cursorColor: 1,
     currentUI: editorUI,
   )
-  if fileExists(path):
-    result.loadTGA(path)
-  else:
-    result.w = 32
-    result.h = 32
-    result.image = RGB18Image(w: 32, h: 32, palette: initialColors, contents: newSeq[uint8](32*32))
-  result.updatePalette()
+  result.loadTGA(path)
+  result.setup()
+
+proc initEditorNewFile*(path: string, w, h: int): Editor =
+  result = Editor(
+    cursorColor: 1,
+    currentUI: editorUI,
+    w: w, h: h,
+    path: path,
+    saveWaiting: false,
+    image: RGB18Image(w: w, h: h, palette: initialColors, contents: newSeq[uint8](w*h))
+  )
+  result.setup()
 
 proc saveImage*(ed: Editor) =
-  writeTGA(ed.path, ed.image.tga)
+  if ed.saveWaiting:
+    writeTGA(ed.path, ed.image.tga)
+
+proc deferSave(ed: var Editor) =
+  ed.saveWaiting = true
+  ed.saveTime = cpuTime() + saveDelay
+
+proc maybeSave*(ed: var Editor) =
+  if ed.saveWaiting and cpuTime() > ed.saveTime:
+    ed.saveWaiting = false
+    ed.saveImage()
 
 proc `[]`*(ed: Editor, x, y: int): uint8 = ed.image.contents[(y * ed.w) + x]
 proc `[]=`*(ed: var Editor, x, y: int, c: uint8) = ed.image.contents[(y * ed.w) + x] = c
@@ -129,9 +155,13 @@ proc moveCursor(ed: var Editor, x, y: int): void =
   ed.cursorY = max(0, min(ed.h-1, ed.cursorY+y))
 
 proc hideEditorSprites(): void =
+  paletteBack.hide()
+  for i in 0..len(paletteBacks)-1:
+    paletteBacks[i].hide()
   paletteWheel.hide()
 
 proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[InstantInput]): bool =
+  hideEditorSprites()
   var newPressed = pressed
   newPressed.excl(ed.lastPressed)
   ed.lastPressed = pressed
@@ -140,8 +170,6 @@ proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[Instan
     hideEditorSprites()
     return true
   if E_Y in pressed:
-    if ed.currentUI == editorUI:
-      hideEditorSprites()
     ed.currentUI = pickerUI
     if E_Y in newPressed:
       initPicker(ed.image.palette[ed.cursorColor])
@@ -162,7 +190,6 @@ proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[Instan
     ed.currentUI = editorUI
   case ed.currentUI:
     of editorUI:
-      paletteWheel.hide()
       if E_Up in newPressed:
         ed.moveCursor(0, +1)
       elif E_Down in newPressed:
@@ -170,10 +197,13 @@ proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[Instan
       elif E_B in pressed:
         if E_X in newPressed: # flood fill, hard to press
           ed.flood(ed.cursorX, ed.cursorY, ed.cursorColor)
+          ed.deferSave()
         elif E_A in newPressed: # eyedropper
           ed.cursorColor = ed[ed.cursorX, ed.cursorY]
+          ed.updatePalette()
       elif E_X in pressed:
         paletteWheel.show()
+        paletteBacks[ed.cursorColor mod 4].show()
         if E_Left in newPressed or E_ScrollUp in instant:
           ed.cursorColor -= 1
           ed.updatePalette()
@@ -186,10 +216,9 @@ proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[Instan
         ed.moveCursor(-1, 0)
       elif E_Right in newPressed:
         ed.moveCursor(+1, 0)
-          
       elif E_A in pressed:
         ed[ed.cursorX, ed.cursorY] = ed.cursorColor
-
+        ed.deferSave()
       if E_ScrollUp in instant:
         if E_Right in pressed or E_Left in pressed:
           ed.moveCursor(+1, 0)

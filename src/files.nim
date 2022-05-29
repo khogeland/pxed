@@ -40,8 +40,11 @@ proc openStorageStream*(path: string, mode: FileMode = fmRead, bufSize: int = -1
 proc resolveStoragePath*(path: string): string =
   return storagePrefix & path
 
-iterator listStorageDir*(path: string): string =
+proc resolveResourcePath*(path: string): string =
+  return resourcePrefix & path
+
+iterator listStorageDir*(path: string, relative = false): string =
   let realPath = storagePrefix & path
   createDir(realPath)
-  for f in walkFiles(realPath & "/*"):
-    yield f
+  for f in walkDir(realPath, relative):
+    yield f[1]

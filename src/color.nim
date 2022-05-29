@@ -1,6 +1,8 @@
 import constants
 
 type
+  BGR24Color* = object
+    b*, g*, r*: uint8
   BGRA32Color* = object
     b*, g*, r*, a*: uint8
   RGB18Color* = object
@@ -19,6 +21,18 @@ func rgb*(bgra: BGRA32Color): RGB18Color = RGB18Color(
   r: (bgra.r shr 2).u6,
   g: (bgra.g shr 2).u6,
   b: (bgra.b shr 2).u6,
+)
+
+func rgb*(bgr: BGR24Color): RGB18Color = RGB18Color(
+  r: (bgr.r shr 2).u6,
+  g: (bgr.g shr 2).u6,
+  b: (bgr.b shr 2).u6,
+)
+
+func bgr*(rgb: RGB18Color): BGR24Color = BGR24Color(
+  b: (rgb.b.uint8 shl 2),
+  g: (rgb.g.uint8 shl 2),
+  r: (rgb.r.uint8 shl 2),
 )
 
 func bgra*(rgb: RGB18Color): BGRA32Color = BGRA32Color(

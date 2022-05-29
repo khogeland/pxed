@@ -1,15 +1,17 @@
 import files
+import sequtils
+import algorithm
+import strutils
 import constants
 import color
 import framebuffer
-import sequtils
 import gfx/image
 import gfx/sprites
 
 type
   Preview* = object
     index: int
-    case empty: bool
+    case empty*: bool
       of false:
         path*: string
         img*: RGB18Image
@@ -21,8 +23,11 @@ type
     previews: seq[Preview]
     lastPressed: set[ButtonInput]
 
-var frameSprite = loadImage(0, 0, 2, "frames.tga")
+#var newfile32 = loadImage(0, 0, 2, "newfile32.tga")
+#var newfile64 = loadImage(0, 0, 1, "newfile64.tga")
+
 var blackFrame = loadImage(0, 0, 2, "blackframe.tga")
+var frameSprite = loadImage(0, 0, 2, "frames.tga")
 #TODO these don't need to be screen sized
 var leftMask = loadImage(0, 0, 2, "leftbrowsermask.tga")
 var rightMask = loadImage(0, 0, 2, "rightbrowsermask.tga")
@@ -61,7 +66,9 @@ proc loadPreview(path: string): Preview =
     raise newException(ValueError, path & ": unsupported image size")
 
 proc updatePalette(br: var Browser) =
-  let palette = br.getSelection().img.palette
+  let p = br.getSelection()
+  if p.empty: return
+  let palette = p.img.palette
   const rgb0 = rgb(0, 0, 0)
   var colors: seq[RGB18Color]
   for c in palette:
@@ -103,7 +110,7 @@ proc initPreviews(br: var Browser) =
   br.previews[1] = Preview(empty: true, index: -1)
   for i in 0..2:
     if i >= len(br.fileList):
-      br.previews[i] = Preview(empty: true, index: i)
+      br.previews[i+2] = Preview(empty: true, index: i)
       continue
     let img18 = readTGA(br.fileList[i]).img18
     if img18.w == 32 and img18.h == 32:
@@ -115,10 +122,22 @@ proc initPreviews(br: var Browser) =
   br.updatePalette()
 
 proc initBrowser*(): Browser =
-  result.fileList = toSeq(listStorageDir("images"))
-  result.initPreviews()
-  frameSprite.show()
-  blackFrame.show()
+  try:
+    result.fileList = newSeq[string]()
+    for f in sorted(toSeq(listStorageDir("images"))):
+      if f.endsWith(".tga"):
+        result.fileList.add(f)
+    result.fileList.add(resolveResourcePath("images/newfile32.tga"))
+    result.fileList.add(resolveResourcePath("images/newfile64.tga"))
+    result.initPreviews()
+    blackFrame.show()
+    frameSprite.show()
+  except:
+    # I have no idea why Nim refuses to print stack traces, so...
+    let e = getCurrentException()
+    echo e.msg
+    echo e.getStackTrace()
+    raise e
 
 proc handleInput*(br: var Browser, pressed: set[ButtonInput], instant: set[InstantInput]): bool =
   var newPressed = pressed
@@ -150,6 +169,10 @@ proc draw*(br: Browser, buffer: var framebuffer18) =
   const offsetY = 32
   const rOffsetX = 109
   const rOffsetY = 26
+  if left.empty:
+    leftMask.show()
+  if right.empty:
+    rightMask.show()
   for y in 0..63:
     for x in 0..63:
       let ssx1 = lOffsetX + x
@@ -163,22 +186,14 @@ proc draw*(br: Browser, buffer: var framebuffer18) =
       let iMain = (ssy2 * SCREEN_WIDTH) + ssx2
       let iRight = (ssy3 * SCREEN_WIDTH) + ssx3
 
-      if not (ssx1 < 0 or ssx1 >= SCREEN_WIDTH or ssy1 < 0 or ssy1 >= SCREEN_HEIGHT):
-        if left.empty:
-          leftMask.show()
-          buffer[iLeft] = main.img.palette[2]
-        else:
-          buffer[iLeft] = left.img.palette[left.img.contents[(y * 64) + x]]
+      if not left.empty and not (ssx1 < 0 or ssx1 >= SCREEN_WIDTH or ssy1 < 0 or ssy1 >= SCREEN_HEIGHT):
+        buffer[iLeft] = left.img.palette[left.img.contents[(y * 64) + x]]
 
       if main.empty:
         buffer[iMain] = rgb(0,0,0)
       else:
         buffer[iMain] = main.img.palette[main.img.contents[(y * 64) + x]]
 
-      if not (ssx3 < 0 or ssx3 >= SCREEN_WIDTH or ssy3 < 0 or ssy3 >= SCREEN_HEIGHT):
-        if right.empty:
-          rightMask.show()
-          buffer[iRight] = main.img.palette[2]
-        else:
-          buffer[iRight] = right.img.palette[right.img.contents[(y * 64) + x]]
+      if not right.empty and not (ssx3 < 0 or ssx3 >= SCREEN_WIDTH or ssy3 < 0 or ssy3 >= SCREEN_HEIGHT):
+        buffer[iRight] = right.img.palette[right.img.contents[(y * 64) + x]]
 

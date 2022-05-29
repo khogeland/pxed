@@ -17,7 +17,8 @@ type Palette* = ref object
   id*: int
   p*: array[256, RGB18Color]
 
-var sprites: Table[int, Sprite]
+# z-order is just insertion order
+var sprites: OrderedTable[int, Sprite]
 var palettes: Table[int, array[256, RGB18Color]]
 var composite: framebuffer18
 var mask: array[BUFFER_LENGTH, bool]
@@ -63,7 +64,7 @@ proc removeSprite*(s: Sprite): void =
   sprites.del(s.id)
 
 proc clearSprites*(): void =
-  sprites = Table[int, Sprite]()
+  sprites = OrderedTable[int, Sprite]()
 
 proc clearPalettes*(): void =
   palettes = Table[int, array[256, RGB18Color]]()
