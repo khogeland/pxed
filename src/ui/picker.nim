@@ -16,17 +16,13 @@ type intOrFloat = float
 converter toIOF(i: int): intOrFloat = float(i)
 
 func radialColorAt(x, y: intOrFloat, value: float): HSVColor =
-  #TODO why the hell isn't this centered why is the circle unevenly sized
-  #let fx = if x < centerPoint[0]: x-0.5 elif x > centerPoint[0]: x+0.5 else: 0
   let dx = (x-centerPoint[0])
   let dy = (y-centerPoint[1])
   let dist = sqrt(dx^2 + dy^2)
-  #left here in memorial of a typo that made a cool looking thing
-  #let distN = max(dist/r, 1.0)
-  #let distN = min(dist/r, 1.0)
-  let distN = dist/radius
-  if distN > 1.0:
+  var distN = dist/radius
+  if distN > 1.01: # create a mask for the picker background
     return hsv(0, 0, 0)
+  distN = min(distN, 1.0)
   if distN < 0.001:
     return hsv(0, distN, value)
   let hue = radToDeg(arctan2(dx, dy) + PI)
@@ -67,9 +63,14 @@ proc closePicker*() =
   pointerSprite.hide()
 
 proc movePickerCursor*(x, y: int): void =
-  #TODO constrain to color wheel
   cursor[0] = max(0, min(SCREEN_WIDTH-1, cursor[0]+x))
   cursor[1] = max(0, min(SCREEN_HEIGHT-1, cursor[1]+y))
+  let dx = (cursor[0]-centerPoint[0])
+  let dy = (cursor[1]-centerPoint[1])
+  let dist = sqrt(dx^2 + dy^2)
+  if dist > radius:
+    cursor[0] = centerPoint[0] + ((dx / dist) * radius)
+    cursor[1] = centerPoint[1] + ((dy / dist) * radius)
   updatePointer()
 
 proc pickerCursorColor*(): RGB18Color =

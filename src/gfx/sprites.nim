@@ -25,7 +25,7 @@ var mask: array[BUFFER_LENGTH, bool]
 var idN: int = 0
 var modified = true
 
-#TODO: no idea if this API will be comfortable
+#this api might be a little stupid
 
 proc addPalette*(p: array[256, RGB18Color]): int =
   let id = idN

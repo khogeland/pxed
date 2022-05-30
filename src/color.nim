@@ -35,6 +35,12 @@ func bgr*(rgb: RGB18Color): BGR24Color = BGR24Color(
   r: (rgb.r.uint8 shl 2),
 )
 
+func bgr*(bgra: BGRA32Color): BGR24Color = BGR24Color(
+  b: bgra.b,
+  g: bgra.g,
+  r: bgra.r,
+)
+
 func bgra*(rgb: RGB18Color): BGRA32Color = BGRA32Color(
   b: (rgb.b.uint8 shl 2),
   g: (rgb.g.uint8 shl 2),
@@ -47,9 +53,6 @@ func adjustValue*(rgb: RGB18Color, value: float): RGB18Color =
   let v = value * 63.9
   if value == 0:
     return RGB18Color(r: 0.u6, g: 0.u6, b: 0.u6)
-  # TODO: organization red flag, this is for the picker color map mask
-  if max(rgb.r, max(rgb.g, rgb.b)) == 0.u6:
-    return rgb(0,0,0)
   let r = rgb.r.float
   let g = rgb.g.float
   let b = rgb.b.float

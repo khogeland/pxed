@@ -8,8 +8,6 @@ import framebuffer
 import gfx/image
 import gfx/sprites
 
-#TODO remember position in browser
-
 type
   Preview* = object
     index: int
@@ -20,13 +18,10 @@ type
       of true:
         discard
   Browser* = object
-    index: int
+    index*: int
     fileList: seq[string]
     previews: seq[Preview]
     lastPressed: set[ButtonInput]
-
-#var newfile32 = loadImage(0, 0, 2, "newfile32.tga")
-#var newfile64 = loadImage(0, 0, 1, "newfile64.tga")
 
 var blackFrame = loadImage(0, 0, 2, "blackframe.tga")
 var frameSprite = loadImage(0, 0, 2, "frames.tga")
@@ -123,23 +118,20 @@ proc initPreviews(br: var Browser) =
       raise newException(ValueError, br.fileList[i] & ": unsupported image size")
   br.updatePalette()
 
-proc initBrowser*(): Browser =
-  try:
-    result.fileList = newSeq[string]()
-    for f in sorted(toSeq(listStorageDir("images"))):
-      if f.endsWith(".tga"):
-        result.fileList.add(f)
-    result.fileList.add(resolveResourcePath("images/newfile32.tga"))
-    result.fileList.add(resolveResourcePath("images/newfile64.tga"))
-    result.initPreviews()
-    blackFrame.show()
-    frameSprite.show()
-  except:
-    # I have no idea why Nim refuses to print stack traces, so...
-    let e = getCurrentException()
-    echo e.msg
-    echo e.getStackTrace()
-    raise e
+proc initBrowser*(index: int = -1): Browser =
+  result.fileList = newSeq[string]()
+  for f in sorted(toSeq(listStorageDir("images"))):
+    if f.endsWith(".tga"):
+      result.fileList.add(f)
+  result.fileList.add(resolveResourcePath("images/newfile32.tga"))
+  result.fileList.add(resolveResourcePath("images/newfile64.tga"))
+  result.initPreviews()
+  blackFrame.show()
+  frameSprite.show()
+  if index >= 0:
+    let i = min(len(result.fileList)-1, index)
+    result.index = i
+    result.shiftPreviews(i)
 
 proc handleInput*(br: var Browser, pressed: set[ButtonInput], instant: set[InstantInput]): bool =
   var newPressed = pressed

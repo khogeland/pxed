@@ -12,8 +12,6 @@ const
 
   TAG: cstring = "spi"
 
-# TODO: SD card support
-
 proc initSpi*(): SpiBus =
   gpio_pad_select_gpio(PIN_DC_NUM)
   check gpio_set_direction(PIN_DC, GPIO_MODE_OUTPUT)
