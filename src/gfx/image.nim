@@ -36,22 +36,48 @@ type
 func valErr*(msg: string): void =
   raise newException(ValueError, msg)
 
+const bgrBlack = rgb(0,0,0).bgr
+const bgraBlack = BGRA32Color(r: 0, g: 0, b: 0, a: 0)
+
 proc compress(tga: TGA): TGA =
   if tga.rle: return tga
   if unlikely(tga.topOrigin):
     valErr("wrong scanline order")
+  var firstBlack = 0'u8
+  if unlikely(tga.palette.alpha):
+    for i in 0'u8..len(tga.palette.palette32)-1:
+      if tga.palette.palette32[i] == bgraBlack:
+        firstBlack = i
+        break
+  else:
+    for i in 0'u8..len(tga.palette.palette24)-1:
+      if tga.palette.palette24[i] == bgrBlack:
+        firstBlack = i
+        break
   result = tga
   result.rle = true
   result.data = newSeq[uint8]()
   var offset = 0'u16
   for y in 0'u16..tga.h-1:
     var prev = tga.data[y*tga.w]
+    # this is *technically* lossy (to your palette), but it allows me to safely save several hundred bytes
+    # by truncating unused palette slots, so... whatever!
+    if tga.palette.alpha:
+      if tga.palette.palette32[prev] == bgraBlack:
+        prev = firstBlack
+    elif tga.palette.palette24[prev] == bgrBlack:
+      prev = firstBlack
     var running = false
     result.data.add(0)
     offset = len(result.data).uint16-1
     result.data.add(prev)
     for x in 1'u64..tga.w-1:
-      let current = tga.data[(y * tga.w) + x]
+      var current = tga.data[(y * tga.w) + x]
+      if tga.palette.alpha:
+        if tga.palette.palette32[current] == bgraBlack:
+          current = firstBlack
+      elif tga.palette.palette24[current] == bgrBlack:
+        current = firstBlack
       if not running:
         if current == prev: # oops, we are running
           running = true

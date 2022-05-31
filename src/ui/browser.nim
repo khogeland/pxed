@@ -8,6 +8,8 @@ import framebuffer
 import gfx/image
 import gfx/sprites
 
+#TODO i will probably want a way to delete files
+
 type
   Preview* = object
     index: int
