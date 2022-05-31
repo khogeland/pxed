@@ -36,20 +36,31 @@ proc zoom(img18: RGB18Image): RGB18Image =
   result.h = img18.h*2
   result.palette = img18.palette
   result.contents = newSeq[uint8](result.w * result.h)
-  let rw = img18.w * 2
   for y in 0..img18.h-1:
     let ry = y*2
     for x in 0..img18.w-1:
       let rx = x*2
       let i = (y * img18.w) + x
-      let i2 = (ry*rw) + rx
+      let i2 = (ry*result.w) + rx
       result.contents[i2] = img18.contents[i]
       result.contents[i2+1] = img18.contents[i]
-    let yi1 = ry * rw
-    let yi2 = yi1 + rw
-    for rx in 0..rw-1:
+    let yi1 = ry * result.w
+    let yi2 = yi1 + result.w
+    for rx in 0..result.w-1:
       result.contents[yi2 + rx] = result.contents[yi1 + rx]
-      #result.contents[yi2 + rx] = 5
+
+proc sample(img18: RGB18Image): RGB18Image =
+  result.w = img18.w div 2
+  result.h = img18.h div 2
+  result.palette = img18.palette
+  result.contents = newSeq[uint8](result.w * result.h)
+  for y in countup(0, img18.h-1, 2):
+    let ry = y div 2
+    for x in countup(0, img18.w-1, 2):
+      let rx = x div 2
+      let i = (y * img18.w) + x
+      let i2 = (ry*result.w) + rx
+      result.contents[i2] = img18.contents[i]
 
 proc loadPreview(path: string): Preview =
   result.empty = false
@@ -59,6 +70,8 @@ proc loadPreview(path: string): Preview =
     result.img = zoom(img18)
   elif img18.w == 64 and img18.h == 64:
     result.img = img18
+  elif img18.w == 128 and img18.h == 128:
+    result.img = sample(img18)
   else:
     raise newException(ValueError, path & ": unsupported image size")
 
@@ -115,6 +128,7 @@ proc initPreviews(br: var Browser) =
     elif img18.w == 64 and img18.h == 64:
       br.previews[i+2] = Preview(empty: false, index: i, path: br.fileList[i], img: img18)
     else:
+      # TODO: gracefully fail, prefilter the file list or show an error icon or something
       raise newException(ValueError, br.fileList[i] & ": unsupported image size")
   br.updatePalette()
 
@@ -125,6 +139,7 @@ proc initBrowser*(index: int = -1): Browser =
       result.fileList.add(f)
   result.fileList.add(resolveResourcePath("images/newfile32.tga"))
   result.fileList.add(resolveResourcePath("images/newfile64.tga"))
+  result.fileList.add(resolveResourcePath("images/newfile128.tga"))
   result.initPreviews()
   blackFrame.show()
   frameSprite.show()

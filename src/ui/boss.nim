@@ -119,6 +119,9 @@ proc handleInput*(pressed: set[ButtonInput], instant: set[InstantInput]) =
         elif path.endsWith("newfile64.tga"):
           newFile = true
           newFileSize = 64
+        elif path.endsWith("newfile128.tga"):
+          newFile = true
+          newFileSize = 128
         if newFile:
           let images = toSeq(listStorageDir("images", true))
           for i in 0..10000:
