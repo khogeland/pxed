@@ -2,7 +2,6 @@ import browser
 import os
 import files
 import strutils
-import sequtils
 import constants
 import gfx/sprites
 import framebuffer
@@ -29,41 +28,46 @@ type
 
 var file: File
 var view: View
-const savePath = resolveStoragePath("current_view")
+const savePath = resolveStoragePath("view")
 
-try:
-  if file.open(savePath, fmRead):
-    var saveState: ViewSaveState
-    var buf = file.readAll()
-    unpack(buf, saveState)
-    case saveState.kind
-    of EditorView:
-      view = View(
-        kind: EditorView,
-        browserIndex: saveState.browserIndex,
-        editor: initEditor(saveState.path)
-      )
-    of BrowserView:
+proc initUI*() =
+  try:
+    if file.open(savePath, fmRead):
+      var saveState: ViewSaveState
+      var buf = file.readAll()
+      unpack(buf, saveState)
+      case saveState.kind
+      of EditorView:
+        view = View(
+          kind: EditorView,
+          browserIndex: saveState.browserIndex,
+          editor: initEditor(saveState.path)
+        )
+      of BrowserView:
+        view = View(
+          kind: BrowserView,
+          browser: initBrowser(saveState.browserIndex)
+        )
+    else:
       view = View(
         kind: BrowserView,
-        browser: initBrowser(saveState.browserIndex)
+        browser: initBrowser(),
       )
-  else:
+  except:
+    let e = getCurrentException()
+    echo e.msg
+    echo e.getStackTrace()
     view = View(
       kind: BrowserView,
       browser: initBrowser(),
     )
-except:
-  let e = getCurrentException()
-  echo e.msg
-  echo e.getStackTrace()
-  view = View(
-    kind: BrowserView,
-    browser: initBrowser(),
-  )
-finally:
-  file.close()
-  discard tryRemoveFile(savePath)
+  finally:
+    file.close()
+    discard tryRemoveFile(savePath)
+
+proc loadSprites*() =
+  loadBrowserSprites()
+  loadEditorSprites()
 
 proc saveUI*() =
   var saveState: ViewSaveState
@@ -87,7 +91,16 @@ proc saveUI*() =
       browserIndex: view.browser.index,
     )
   var buf = pack(saveState)
-  writeFile(savePath, buf)
+  try:
+    echo savePath
+    echo file.open(savePath, fmWrite)
+    file.write(buf)
+  finally:
+    file.close()
+
+proc maybeSaveImage*() =
+  if view.kind == EditorView:
+    view.editor.maybeSave()
 
 var previousViewPressed: set[ButtonInput]
 
@@ -106,6 +119,7 @@ proc handleInput*(pressed: set[ButtonInput], instant: set[InstantInput]) =
           kind: BrowserView,
           browser: initBrowser(view.browserIndex),
         )
+        saveUI()
     of BrowserView:
       if view.browser.handleInput(newPressed, instant):
         previousViewPressed = pressed
@@ -123,7 +137,9 @@ proc handleInput*(pressed: set[ButtonInput], instant: set[InstantInput]) =
           newFile = true
           newFileSize = 128
         if newFile:
-          let images = toSeq(listStorageDir("images", true))
+          var images = newSeq[string]()
+          for s in listStorageDir("images", true):
+            images.add(s.toLowerAscii)
           for i in 0..10000:
             let name = $i & ".tga"
             if not(name in images):
@@ -140,6 +156,7 @@ proc handleInput*(pressed: set[ButtonInput], instant: set[InstantInput]) =
             browserIndex: view.browser.index,
             editor: initEditor(path),
           )
+        saveUI()
 
 proc drawUI*(buffer: var framebuffer18) =
   case view.kind

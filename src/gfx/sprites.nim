@@ -20,8 +20,8 @@ type Palette* = ref object
 # z-order is just insertion order
 var sprites: OrderedTable[int, Sprite]
 var palettes: Table[int, array[256, RGB18Color]]
-var composite: framebuffer18
-var mask: array[BUFFER_LENGTH, bool]
+var composite = newSeq[RGB18Color](BUFFER_LENGTH)
+var mask = newSeq[bool](BUFFER_LENGTH)
 var idN: int = 0
 var modified = true
 
@@ -51,7 +51,9 @@ proc addSprite*(x, y, w, h, factor, palette: int, contents: seq[uint8]): Sprite 
   sprites[id] = result
 
 proc loadImage*(x, y, factor: int, path: string): Sprite =
-  let img18 = readTGA(openResourceStream("sprites/" & path)).img18
+  let img18 = readTGA(resolveResourcePath("/sprites/" & path)).img18
+  #TODO load sprites from SPIFFS
+  #let img18 = RGB18Image(w: 1, h: 1)
   let palette = addPalette(img18.palette)
   return addSprite(x, y, img18.w, img18.h, factor, palette, img18.contents)
 

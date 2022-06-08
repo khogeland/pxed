@@ -3,12 +3,10 @@ import color
 import math
 import framebuffer
 import gfx/sprites
-#import strutils
 
 const TAG*: cstring = "palette"
 
 const
-  moveSpeed = 0.5
   centerPoint = (SCREEN_WIDTH / 2.0, SCREEN_HEIGHT / 2.0)
   radius = (min(SCREEN_WIDTH, SCREEN_HEIGHT)/2.0)-5
 
@@ -46,8 +44,10 @@ const baseColorMap: framebuffer18 = static:
 
 var value: float
 var cursor: (float, float)
-var pointerSprite = loadImage(10, 10, 2, "glass.tga")
-pointerSprite.hide()
+var pointerSprite: Sprite
+
+proc loadPickerSprites*() = 
+    pointerSprite = loadImage(10, 10, 2, "glass.tga")
 
 proc updatePointer(): void =
   pointerSprite.move(int(cursor[0]-8), int(cursor[1]-8))

@@ -1,4 +1,5 @@
 import files
+import os
 import sequtils
 import algorithm
 import strutils
@@ -8,7 +9,7 @@ import framebuffer
 import gfx/image
 import gfx/sprites
 
-#TODO i will probably want a way to delete files
+#TODO file deletion
 
 type
   Preview* = object
@@ -25,11 +26,15 @@ type
     previews: seq[Preview]
     lastPressed: set[ButtonInput]
 
-var blackFrame = loadImage(0, 0, 2, "blackframe.tga")
-var frameSprite = loadImage(0, 0, 2, "frames.tga")
-#TODO these don't need to be screen sized
-var leftMask = loadImage(0, 0, 2, "leftbrowsermask.tga")
-var rightMask = loadImage(0, 0, 2, "rightbrowsermask.tga")
+var
+  blackFrame, frameSprite, leftMask, rightMask: Sprite
+
+proc loadBrowserSprites*() =
+  blackFrame = loadImage(0, 0, 2, "blackframe.tga")
+  frameSprite = loadImage(0, 0, 2, "frames.tga")
+  #TODO these don't need to be screen sized
+  leftMask = loadImage(0, 0, 2, "leftbrowsermask.tga")
+  rightMask = loadImage(0, 0, 2, "rightbrowsermask.tga")
 
 proc getSelection*(br: Browser): Preview = br.previews[2]
 
@@ -75,7 +80,7 @@ proc loadPreview(path: string): Preview =
   elif img18.w == 128 and img18.h == 128:
     result.img = sample(img18)
   else:
-    raise newException(ValueError, path & ": unsupported image size")
+    raise newException(ValueError, path & ": unsupported image size: " & $img18.w & " * " & $img18.h)
 
 proc updatePalette(br: var Browser) =
   let p = br.getSelection()
@@ -121,27 +126,38 @@ proc initPreviews(br: var Browser) =
   br.previews[0] = Preview(empty: true, index: -2)
   br.previews[1] = Preview(empty: true, index: -1)
   for i in 0..2:
-    if i >= len(br.fileList):
-      br.previews[i+2] = Preview(empty: true, index: i)
-      continue
-    let img18 = readTGA(br.fileList[i]).img18
-    if img18.w == 32 and img18.h == 32:
-      br.previews[i+2] = Preview(empty: false, index: i, path: br.fileList[i], img: zoom(img18))
-    elif img18.w == 64 and img18.h == 64:
-      br.previews[i+2] = Preview(empty: false, index: i, path: br.fileList[i], img: img18)
-    else:
-      # TODO: gracefully fail, prefilter the file list or show an error icon or something
-      raise newException(ValueError, br.fileList[i] & ": unsupported image size")
+    var name = "empty"
+    try:
+      if i >= len(br.fileList):
+        br.previews[i+2] = Preview(empty: true, index: i)
+        continue
+      name = br.fileList[i]
+      let img18 = readTGA(br.fileList[i]).img18
+      if img18.w == 32 and img18.h == 32:
+        br.previews[i+2] = Preview(empty: false, index: i, path: br.fileList[i], img: zoom(img18))
+      elif img18.w == 64 and img18.h == 64:
+        br.previews[i+2] = Preview(empty: false, index: i, path: br.fileList[i], img: img18)
+      elif img18.w == 128 and img18.h == 128:
+        br.previews[i+2] = Preview(empty: false, index: i, path: br.fileList[i], img: sample(img18))
+      else:
+        # TODO: gracefully fail, prefilter the file list or show an error icon or something
+        raise newException(ValueError, br.fileList[i] & ": unsupported image size: " & $img18.w & " * " & $img18.h)
+    except:
+      br.previews[i+2] = Preview(empty: true, index: 0)
+      let e = getCurrentException()
+      echo name & ": " & e.msg
+
   br.updatePalette()
 
 proc initBrowser*(index: int = -1): Browser =
+  echo "arstarst " & $fileExists("/data/images/0.tga")
   result.fileList = newSeq[string]()
   for f in sorted(toSeq(listStorageDir("images"))):
-    if f.endsWith(".tga"):
+    if f.toLowerAscii.endsWith(".tga"):
       result.fileList.add(f)
-  result.fileList.add(resolveResourcePath("images/newfile32.tga"))
-  result.fileList.add(resolveResourcePath("images/newfile64.tga"))
-  result.fileList.add(resolveResourcePath("images/newfile128.tga"))
+  result.fileList.add(resolveResourcePath("/images/newfile32.tga"))
+  result.fileList.add(resolveResourcePath("/images/newfile64.tga"))
+  result.fileList.add(resolveResourcePath("/images/newfile128.tga"))
   result.initPreviews()
   blackFrame.show()
   frameSprite.show()
@@ -171,18 +187,18 @@ proc handleInput*(br: var Browser, pressed: set[ButtonInput], instant: set[Insta
 proc draw*(br: Browser, buffer: var framebuffer18) =
   leftMask.hide()
   rightMask.hide()
-  let left = br.previews[1]
-  let main = br.previews[2]
-  let right = br.previews[3]
+  let leftP = br.previews[1]
+  let mainP = br.previews[2]
+  let rightP  = br.previews[3]
   const lOffsetX = -46
   const lOffsetY = 26
   const offsetX = 32
   const offsetY = 32
   const rOffsetX = 109
   const rOffsetY = 26
-  if left.empty:
+  if leftP.empty:
     leftMask.show()
-  if right.empty:
+  if rightP.empty:
     rightMask.show()
   for y in 0..63:
     for x in 0..63:
@@ -197,14 +213,14 @@ proc draw*(br: Browser, buffer: var framebuffer18) =
       let iMain = (ssy2 * SCREEN_WIDTH) + ssx2
       let iRight = (ssy3 * SCREEN_WIDTH) + ssx3
 
-      if not left.empty and not (ssx1 < 0 or ssx1 >= SCREEN_WIDTH or ssy1 < 0 or ssy1 >= SCREEN_HEIGHT):
-        buffer[iLeft] = left.img.palette[left.img.contents[(y * 64) + x]]
+      if not leftP.empty and not (ssx1 < 0 or ssx1 >= SCREEN_WIDTH or ssy1 < 0 or ssy1 >= SCREEN_HEIGHT):
+        buffer[iLeft] = leftP.img.palette[leftP.img.contents[(y * 64) + x]]
 
-      if main.empty:
+      if mainP.empty:
         buffer[iMain] = rgb(0,0,0)
       else:
-        buffer[iMain] = main.img.palette[main.img.contents[(y * 64) + x]]
+        buffer[iMain] = mainP.img.palette[mainP.img.contents[(y * 64) + x]]
 
-      if not right.empty and not (ssx3 < 0 or ssx3 >= SCREEN_WIDTH or ssy3 < 0 or ssy3 >= SCREEN_HEIGHT):
-        buffer[iRight] = right.img.palette[right.img.contents[(y * 64) + x]]
+      if not rightP.empty and not (ssx3 < 0 or ssx3 >= SCREEN_WIDTH or ssy3 < 0 or ssy3 >= SCREEN_HEIGHT):
+        buffer[iRight] = rightP.img.palette[rightP.img.contents[(y * 64) + x]]
 

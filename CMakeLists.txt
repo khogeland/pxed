@@ -4,10 +4,14 @@ cmake_minimum_required(VERSION 3.5)
 
 # (Not part of the boilerplate)
 
-set(EXTRA_COMPONENT_DIRS $ENV{IDF_PATH}/examples/common_components/protocol_examples_common)
+#set(EXTRA_COMPONENT_DIRS $ENV{IDF_PATH}/examples/common_components/protocol_examples_common)
 # set(EXTRA_COMPONENT_DIRS src)
 
+# so far I have failed to disable the fat waste of space that is the networking shit
+#set (COMPONENTS main vfs newlib nvs_flash fatfs freertos_dummy)
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+
 project(pxed)
 
 idf_build_set_property(C_COMPILE_OPTIONS -Wno-error=unused-label APPEND)

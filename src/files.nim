@@ -1,41 +1,64 @@
 import os
-import streams
-export streams
+import posix
+
+const storagePrefixEsp* = "/data"
+const resourcePrefixEsp* = "/resources"
 
 const storagePrefix =
   when defined(macosx) or defined(linux):
     getHomeDir() & "/.pxed/data/"
   else:
-    "/data/"
+    storagePrefixEsp & "/"
 const resourcePrefix =
   when defined(macosx) or defined(linux):
-    "resources/"
+    "resources"
   else:
-    "/resources/"
+    resourcePrefixEsp
 
+# copypasta to remove lstat usage which is not implemented in esp-idf's newlib
+iterator walkDir*(dir: string; relative = false):
+  tuple[kind: PathComponent, path: string] {.tags: [ReadDirEffect].} =
+    var d = opendir(dir)
+    if d == nil:
+      discard
+      #raiseOSError(osLastError(), dir)
+    else:
+      defer: discard closedir(d)
+      while true:
+        var x = readdir(d)
+        if x == nil: break
+        var y = $cstring(addr x.d_name)
+        if y != "." and y != "..":
+          var s: Stat
+          let path = dir / y
+          if not relative:
+            y = path
+          var k = pcFile
 
-proc openFileStream(path: string, mode: FileMode = fmRead, bufSize: int = -1): FileStream =
-  createDir(parentDir(path))
-  return newFileStream(path, mode, bufSize)
+          if stat(path, s) < 0'i32: continue  # don't yield
+          elif S_ISDIR(s.st_mode):
+            k = pcDir
 
-proc maybeOpenFileStream(path: string, st: var FileStream, mode: FileMode = fmRead, bufSize: int = -1): bool =
-  if not fileExists(path):
-    return false
-  else:
-    st = newFileStream(path, mode, bufSize)
-    return true
+          yield (k, y)
 
-proc openResourceStream*(path: string, st: var FileStream, bufSize: int = -1): bool =
-  return maybeOpenFileStream(resourcePrefix & path, st, fmRead, bufSize)
+#proc maybeOpenFileStream(path: string, st: var FileStream, mode: FileMode = fmRead, bufSize: int = -1): bool =
+  #if not fileExists(path):
+    #return false
+  #else:
+    #st = openFileStream(path, mode, bufSize)
+    #return true
 
-proc openResourceStream*(path: string, bufSize: int = -1): FileStream =
-  return openFileStream(resourcePrefix & path, fmRead, bufSize)
+#proc openResourceStream*(path: string, st: var FileStream, bufSize: int = -1): bool =
+  #return maybeOpenFileStream(resourcePrefix & path, st, fmRead, bufSize)
 
-proc openStorageStream*(path: string, st: var FileStream, mode: FileMode = fmRead, bufSize: int = -1): bool =
-  return maybeOpenFileStream(storagePrefix & path, st, mode, bufSize)
+#proc openResourceStream*(path: string, bufSize: int = -1): FileStream =
+  #return openFileStream(resourcePrefix & path, fmRead, bufSize)
 
-proc openStorageStream*(path: string, mode: FileMode = fmRead, bufSize: int = -1): FileStream =
-  return openFileStream(storagePrefix & path, mode, bufSize)
+#proc openStorageStream*(path: string, st: var FileStream, mode: FileMode = fmRead, bufSize: int = -1): bool =
+  #return maybeOpenFileStream(storagePrefix & path, st, mode, bufSize)
+
+#proc openStorageStream*(path: string, mode: FileMode = fmRead, bufSize: int = -1): FileStream =
+  #return openFileStream(storagePrefix & path, mode, bufSize)
 
 proc resolveStoragePath*(path: string): string =
   return storagePrefix & path
@@ -45,6 +68,13 @@ proc resolveResourcePath*(path: string): string =
 
 iterator listStorageDir*(path: string, relative = false): string =
   let realPath = storagePrefix & path
-  createDir(realPath)
+  discard existsOrCreateDir(realPath)
+  #var omitNext = true
+  #for i in 1.. realPath.len-1:
+    #if realPath[i] in {DirSep, AltSep}:
+      #if omitNext:
+        #omitNext = false
+      #else:
+        #discard existsOrCreateDir(substr(realPath, 0, i-1))
   for f in walkDir(realPath, relative):
     yield f[1]

@@ -6,9 +6,7 @@ import picker
 import gfx/sprites
 import gfx/image
 
-#TODO palette rearrangement?
-
-const initialColors: array[256, RGB18Color] = block:
+let initialColors: array[256, RGB18Color] = block:
   var colors: array[256, RGB18Color]
   colors[0] = rgb(0.1, 0.1, 0.1)
   colors[1] = rgb(0.8, 0.8, 0.8)
@@ -29,8 +27,6 @@ type Editor* = object
   cursorColor: uint8
   lastPressed: set[ButtonInput]
   image: RGB18Image
-  #contents: array[W * H, uint8]
-  #palette: Palette
   currentUI: UIType
   path*: string
   saveWaiting: bool
@@ -41,15 +37,22 @@ type Editor* = object
   zoomX, zoomY: int
 
 const saveDelay = 2.0
-var paletteBack = loadImage(86, 104, 2, "paletteback.tga")
-var paletteBacks = @[
-  loadImage(86, 104, 2, "paletteback1.tga"),
-  loadImage(86, 104, 2, "paletteback2.tga"),
-  loadImage(86, 104, 2, "paletteback3.tga"),
-  loadImage(86, 104, 2, "paletteback4.tga"),
-]
-var paletteWheel = loadImage(90, 108, 2, "palette.tga")
-let paletteId = paletteWheel.palette
+var paletteBack: Sprite
+var paletteBacks: seq[Sprite]
+var paletteWheel: Sprite
+var paletteId: int
+
+proc loadEditorSprites*() =
+  loadPickerSprites()
+  paletteBack = loadImage(86, 104, 2, "paletteback.tga")
+  paletteBacks = @[
+    loadImage(86, 104, 2, "paletteback1.tga"),
+    loadImage(86, 104, 2, "paletteback2.tga"),
+    loadImage(86, 104, 2, "paletteback3.tga"),
+    loadImage(86, 104, 2, "paletteback4.tga"),
+  ]
+  paletteWheel = loadImage(90, 108, 2, "palette.tga")
+  paletteId = paletteWheel.palette
 
 proc setImage*(ed: var Editor, img: RGB18Image) =
   ed.w = img.w

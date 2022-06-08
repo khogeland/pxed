@@ -19,8 +19,6 @@ type ButtonInput* = enum
   E_B
   E_X
   E_Y
-  E_L
-  E_R
 
 type InstantInput* = enum
   E_ScrollUp

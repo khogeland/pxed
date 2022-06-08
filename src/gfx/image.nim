@@ -1,7 +1,5 @@
 import color
-import streams
 
-# TODO run-length encoding
 type
   TGAPalette = object
     case alpha: bool
@@ -160,8 +158,8 @@ proc img18*(tga: TGA): RGB18Image =
 
 const black = rgb(0,0,0).bgr
 
-proc writeTGA*(st: FileStream, tga: TGA): void =
-  let tga = compress(tga)
+proc writeTGA*(f: File, tga: TGA): void =
+  var tga = compress(tga)
   var mapTrailingZero = 0'u16
   var palette: seq[BGR24Color]
   if tga.palette.alpha:
@@ -179,7 +177,7 @@ proc writeTGA*(st: FileStream, tga: TGA): void =
       else:
         mapTrailingZero = 0
       palette.add(color)
-  let header = TGAHeader(
+  var header = TGAHeader(
     idLen: 0,
     colorMapType: 1,
     imageType: 9,
@@ -193,28 +191,30 @@ proc writeTGA*(st: FileStream, tga: TGA): void =
     bpp: 8,
     descriptor: 0, # always write with bottom origin
   )
-  st.write(header)
-  for i in 0..header.mapLen.uint64-1:
-    st.write(palette[i])
+  echo f.writeBuffer(addr header, sizeof TGAHeader) == sizeof TGAHeader
+  echo f.writeBuffer(addr palette[0], header.mapLen.int*(sizeof BGR24Color))
   if tga.topOrigin: # we gotta flip it!!!!
     for i in 0..len(tga.data)-1:
       let tx = i mod tga.w.int
       let ty = (i - tx) div tga.w.int
       let sy = (tga.h.int-1)-ty
-      st.write(tga.data[(sy * tga.w.int) + tx])
+      var byt = tga.data[(sy * tga.w.int) + tx]
+      discard f.writeBuffer(addr byt, 1)
   else:
-    for pixel in tga.data:
-      st.write(pixel)
+    discard f.writeBuffer(addr tga.data[0], len(tga.data))
 
 proc writeTGA*(path: string, tga: TGA): void =
-  let st = newFileStream(path, fmWrite)
+  echo path
+  var f: File
+  if not f.open(path, fmWrite):
+    raise newException(OSError, "could not open file")
   defer:
-    st.close()
-  writeTGA(st, tga)
+    f.close()
+  writeTGA(f, tga)
 
-proc readTGA*(st: FileStream): TGA =
+proc readTGA*(f: File): TGA =
   var header: TGAHeader
-  st.read(header)
+  discard f.readBuffer(addr header, sizeof header)
   if unlikely(header.colorMapType != 1):
     valErr("incorrect color map type: " & $header.colorMapType)
   if unlikely(header.imageType != 1 and header.imageType != 9):
@@ -230,36 +230,46 @@ proc readTGA*(st: FileStream): TGA =
   result.h = header.h
   result.rle = header.imageType == 9
   result.topOrigin = (header.descriptor and 0b00100000) != 0
+  var buf: array[8, uint8]
   if header.idLen != 0:
-    for _ in 1'u8..header.idLen:
-      discard st.readUint8()
+    valErr("id length non-zero")
   if header.mapEntryBits == 32:
     result.palette = TGAPalette(alpha: true)
     for i in 0'u16..header.mapLen-1:
       var c: BGRA32Color
-      st.read(c)
+      discard f.readBuffer(addr c, 4)
       result.palette.palette32[i] = c
   else:
     result.palette = TGAPalette(alpha: false)
     for i in 0'u16..header.mapLen-1:
       var c: BGR24Color
-      st.read(c)
+      discard f.readBuffer(addr c, 3)
       result.palette.palette24[i] = c
   let size = header.w * header.h
   if result.rle:
     while true:
-      try:
-        result.data.add(st.readUint8())
-      except IOError:
+      let read = f.readBuffer(addr buf, len(buf))
+      if read == 0:
         break
+      for i in 0..read-1:
+        result.data.add(buf[i])
     result = decompress(result)
   else:
-    for _ in 1'u16..size:
-      result.data.add(st.readUint8())
+    var rem = size
+    while true:
+      let read = f.readBuffer(addr buf, len(buf))
+      if read == 0:
+        break
+      for i in 0..read-1:
+        rem -= 1
+        result.data.add(buf[i])
+        if rem == 0:
+          return
 
 proc readTGA*(path: string): TGA =
-  let st = newFileStream(path)
+  var f: File
+  if not f.open(path, fmRead):
+    raise newException(OSError, "could not open file " & path)
   defer:
-    st.close()
-  return readTGA(st)
-
+    f.close()
+  return readTGA(f)

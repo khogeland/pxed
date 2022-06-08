@@ -4,3 +4,4 @@ nvs,data,nvs,0x11000,24K,
 phy_init,data,phy,0x17000,4K,
 factory,app,factory,0x20000,1M,
 pxed, data, fat, 0x120000, 1M,
+res, data, spiffs, 0x220000, 500K

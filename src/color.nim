@@ -1,11 +1,11 @@
 import constants
 
 type
-  BGR24Color* = object
+  BGR24Color* {.packed.} = object
     b*, g*, r*: uint8
-  BGRA32Color* = object
+  BGRA32Color* {.packed.} = object
     b*, g*, r*, a*: uint8
-  RGB18Color* = object
+  RGB18Color* {.packed.} = object
     r*, g*, b*: u6
   HSVColor* = object
     hue*, saturation*, value*: float

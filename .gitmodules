@@ -1,3 +1,6 @@
 [submodule "vendor/gifenc"]
 	path = vendor/gifenc
 	url = https://github.com/lecram/gifenc
+[submodule "nesper"]
+	path = nesper
+	url = https://github.com/khogeland/nesper/
