@@ -1,8 +1,8 @@
 build/
 nimcache/
+ignore/
 desktop_host
 sdkconfig.old
-src/test
 .DS_Store
 *.ase
 *.aseprite

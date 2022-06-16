@@ -1,7 +1,7 @@
 
 idf_component_register(SRC_DIRS "nimcache"
-                    INCLUDE_DIRS ""
-                    REQUIRES newlib nvs_flash fatfs freertos_dummy spiffs)
+                    INCLUDE_DIRS "nimcache"
+                    REQUIRES newlib nvs_flash freertos_dummy spiffs esp_littlefs tinyusb esp_adc_cal)
 
 # set(C_COMPILE_OPTIONS "${C_COMPILE_OPTIONS} -Wno-error=unused-label")
 # list(APPEND C_COMPILE_OPTIONS "-Wno-error=unused-label ")
@@ -18,3 +18,5 @@ idf_build_set_property(C_COMPILE_OPTIONS -Wno-error=address APPEND)
 idf_build_set_property(C_COMPILE_OPTIONS -Wno-unused-but-set-variable APPEND)
 
 spiffs_create_partition_image(res ../resources FLASH_IN_PROJECT)
+# we don't want to wipe user data on error, so format manually when necessary
+#fatfs_create_spiflash_image(userdata ../empty_flash)

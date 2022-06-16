@@ -166,15 +166,15 @@ proc initBrowser*(index: int = -1): Browser =
     result.index = i
     result.shiftPreviews(i)
 
-proc handleInput*(br: var Browser, pressed: set[ButtonInput], instant: set[InstantInput]): bool =
+proc handleInput*(br: var Browser, pressed: set[ButtonInput], instant: set[InstantInput], scrollSpeed = 1): bool =
   var newPressed = pressed
   newPressed.excl(br.lastPressed)
   br.lastPressed = pressed
   let oldIndex = br.index
   if E_Left in newPressed or E_ScrollDown in instant:
-    br.index = max(br.index-1, 0)
+    br.index = max(br.index-scrollSpeed, 0)
   elif E_Right in newPressed or E_ScrollUp in instant:
-    br.index = min(br.index+1, len(br.fileList)-1)
+    br.index = min(br.index+scrollSpeed, len(br.fileList)-1)
   elif E_A in pressed:
     leftMask.hide()
     rightMask.hide()

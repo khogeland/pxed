@@ -104,7 +104,7 @@ proc maybeSaveImage*() =
 
 var previousViewPressed: set[ButtonInput]
 
-proc handleInput*(pressed: set[ButtonInput], instant: set[InstantInput]) =
+proc handleInput*(pressed: set[ButtonInput], instant: set[InstantInput], scrollSpeed = 1) =
   var newPressed = pressed
   newPressed.excl(previousViewPressed)
   var released = previousViewPressed
@@ -112,7 +112,7 @@ proc handleInput*(pressed: set[ButtonInput], instant: set[InstantInput]) =
   previousViewPressed.excl(released)
   case view.kind
     of EditorView:
-      if view.editor.handleInput(newPressed, instant):
+      if view.editor.handleInput(newPressed, instant, scrollSpeed):
         previousViewPressed = pressed
         view.editor.saveImage()
         view = View(
@@ -121,7 +121,7 @@ proc handleInput*(pressed: set[ButtonInput], instant: set[InstantInput]) =
         )
         saveUI()
     of BrowserView:
-      if view.browser.handleInput(newPressed, instant):
+      if view.browser.handleInput(newPressed, instant, scrollSpeed):
         previousViewPressed = pressed
         let preview = view.browser.getSelection()
         var path = preview.path

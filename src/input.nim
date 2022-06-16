@@ -6,7 +6,7 @@ import nesper/queues
 import nesper
 import device/pins
 import constants
-#
+import strutils
 
 const
   TAG*: cstring = "input"
@@ -32,8 +32,6 @@ type InputEventType* = enum
 
 var debugQueue: QueueHandle_t
 var inputQueue: QueueHandle_t
-
-var lastTicks: TickType_t
 
 var bintp: proc(_: pointer): void {.cdecl.}
 
@@ -128,35 +126,49 @@ proc handleShutdown(unused: pointer) {.cdecl.} =
   #delayMillis(1000)
   #check gpio_set_level(PIN_OFF, 0)
 
-proc handleScrollAInterrupt(unused: pointer) {.cdecl.} =
-  let ticks = xTaskGetTickCountFromISR()
-  if ticks > lastTicks+1:
-    let pressed = pollButtons()
-    delayMillis(1)
-    let scrollA = gpio_get_level(PIN_SCROLL_A)
-    let scrollB = gpio_get_level(PIN_SCROLL_B)
-    #let dbg = (scrollA shl 1) or scrollB
-    var scroll = if scrollA == scrollB:
-      E_ScrollUp
-    else:
-      E_ScrollDown
+var scrollState: uint8 = 0
+proc handleScrollInterrupt(unused: pointer) {.cdecl.} =
+  var scrollA = uint8(gpio_get_level(PIN_SCROLL_A))
+  var scrollB = uint8(gpio_get_level(PIN_SCROLL_B))
+  let S0: uint8 = scrollState and 0b11
+  let S1: uint8 = (scrollState shr 2) and 0b11
+  let C: uint8 = (scrollA shl 1) or scrollB
+  # if we're at a detent or midway, any movement is valid:
+  if S0 mod 0b11 == 0:
+    scrollState = (scrollState shl 2) or C
+  # if we're between a detent and a midway point, we must complete the motion in the same direction:
+  elif C != S1 and C mod 0b11 == 0: 
+    scrollState = (scrollState shl 2) or C
+  else:
+    return
+  # finally, check if we're in the detent position and what direction we were going:
+  if (scrollState and 0b1111) == 0b1011:
     var state = InputStateMasked(
-      pressed: packButtons(pressed),
-      instant: packInstant({scroll})
+      pressed: packButtons(pollButtons()),
+      instant: packInstant({E_ScrollDown}),
     )
     discard xQueueSend(inputQueue, addr state, 0)
-    lastTicks = ticks
+  elif (scrollState and 0b1111) == 0b0111:
+    var state = InputStateMasked(
+      pressed: packButtons(pollButtons()),
+      instant: packInstant({E_ScrollUp}),
+    )
+    discard xQueueSend(inputQueue, addr state, 0)
 
 proc handleButtonInterrupt(unused: pointer) {.cdecl.} =
   var state = InputStateMasked(
     pressed: packButtons(pollButtons()),
     instant: 0.InstantMask
   )
-  var i = 0
-  discard xQueueSend(debugQueue, addr i, 0)
+  #var i = 0
+  #discard xQueueSend(debugQueue, addr i, 0)
   discard xQueueSend(inputQueue, addr state, 0)
 
 bintp = handleButtonInterrupt
+
+proc installScrollInterrupt*() =
+  check gpio_isr_handler_add(PIN_SCROLL_A, handleScrollInterrupt, nil)
+  check gpio_isr_handler_add(PIN_SCROLL_B, handleScrollInterrupt, nil)
 
 proc initInput*() = 
   configure(
@@ -179,12 +191,6 @@ proc initInput*() =
     interrupt = INTR_ANYEDGE,
   )
   configure(
-    {PIN_SCROLL_B},
-    mode = MODE_INPUT,
-    pull_up = true,
-    pull_down = false,
-  )
-  configure(
     {PIN_OFF_INT},
     mode = MODE_INPUT,
     pull_up = false,
@@ -198,6 +204,13 @@ proc initInput*() =
     pull_down = false,
     interrupt = INTR_ANYEDGE,
   )
+  configure(
+    {PIN_SCROLL_B},
+    mode = MODE_INPUT,
+    pull_up = true,
+    pull_down = false,
+    interrupt = INTR_ANYEDGE,
+  )
   check gpio_set_level(PIN_OFF, 1)
   check gpio_set_level(PIN_X_0, 1)
   check gpio_set_level(PIN_X_1, 1)
@@ -205,7 +218,7 @@ proc initInput*() =
   debugQueue = xQueueCreate(30, sizeof(int))
   inputQueue = xQueueCreate(30, sizeof(InputStateMasked))
   check gpio_install_isr_service(esp_intr_flags(0))
-  check gpio_isr_handler_add(PIN_SCROLL_A, handleScrollAInterrupt, nil)
+  installScrollInterrupt()
   check gpio_isr_handler_add(PIN_OFF_INT, handleShutdown, nil)
   enableButtonInterrupts()
 
@@ -218,4 +231,4 @@ proc getInputStates*(): seq[InputState] =
     ))
   #var i: int
   #while xQueueReceive(debugQueue, addr i, 0) != 0:
-    #echo i
+    #echo i.toBin(8)

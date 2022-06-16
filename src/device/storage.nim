@@ -1,15 +1,15 @@
 import nesper
-import nesper/esp/esp_vfs_fat
 import spiffs
+import littlefs
 import files
 
 proc initStorage*(): void =
   try:
-    var config: esp_vfs_fat_mount_config_t
-    var wlHandle: wl_handle_t
-    config.max_files = 4
-    config.format_if_mount_failed = true
-    check esp_vfs_fat_spiflash_mount(storagePrefixEsp, "pxed", addr config, addr wlHandle)
+    var config: esp_vfs_littlefs_conf_t
+    config.base_path = storagePrefixEsp
+    config.format_if_mount_failed = 1
+    config.partition_label = "userdata"
+    check esp_vfs_littlefs_register(addr config)
     var sconfig: esp_vfs_spiffs_conf_t
     sconfig.base_path = resourcePrefixEsp
     sconfig.format_if_mount_failed = false

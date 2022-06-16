@@ -36,7 +36,7 @@ type Editor* = object
   zoom: int
   zoomX, zoomY: int
 
-const saveDelay = 2.0
+const saveDelay = 1.0
 var paletteBack: Sprite
 var paletteBacks: seq[Sprite]
 var paletteWheel: Sprite
@@ -193,7 +193,7 @@ proc hideEditorSprites(): void =
     paletteBacks[i].hide()
   paletteWheel.hide()
 
-proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[InstantInput]): bool =
+proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[InstantInput], scrollSpeed = 1): bool =
   hideEditorSprites()
   var newPressed = pressed
   newPressed.excl(ed.lastPressed)
@@ -215,15 +215,17 @@ proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[Instan
       if E_X in newPressed and E_B in pressed:
         ed.flood(ed.cursorX, ed.cursorY, ed.cursorColor)
         ed.deferSave()
+      if not(E_X in pressed):
+        ed.colorSwapping = false
       if E_X in pressed and not(E_B in pressed):
         paletteWheel.show()
         paletteBacks[ed.cursorColor mod 4].show()
-        if E_Left in newPressed or E_ScrollUp in instant:
-          ed.cursorColor -= 1
+        if E_Left in newPressed or E_ScrollDown in instant:
+          ed.cursorColor -= scrollSpeed.uint8
           ed.updatePalette()
           return
-        elif E_Right in newPressed or E_ScrollDown in instant:
-          ed.cursorColor += 1
+        elif E_Right in newPressed or E_ScrollUp in instant:
+          ed.cursorColor += scrollSpeed.uint8
           ed.updatePalette()
           return
         elif E_Up in newPressed:
@@ -247,32 +249,32 @@ proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[Instan
       elif E_Y in pressed:
         if E_Up in pressed:
           if E_Up in newPressed or E_ScrollUp in instant:
-            ed.moveZoom(0, 1)
-            ed.moveCursor(0, 1)
+            ed.moveZoom(0, scrollSpeed)
+            ed.moveCursor(0, scrollSpeed)
           elif E_ScrollDown in instant:
-            ed.moveZoom(0, -1)
-            ed.moveCursor(0, -1)
+            ed.moveZoom(0, -scrollSpeed)
+            ed.moveCursor(0, -scrollSpeed)
         elif E_Down in pressed:
           if E_Down in newPressed or E_ScrollDown in instant:
-            ed.moveZoom(0, -1)
-            ed.moveCursor(0, -1)
+            ed.moveZoom(0, -scrollSpeed)
+            ed.moveCursor(0, -scrollSpeed)
           elif E_ScrollUp in instant:
-            ed.moveZoom(0, 1)
-            ed.moveCursor(0, 1)
+            ed.moveZoom(0, scrollSpeed)
+            ed.moveCursor(0, scrollSpeed)
         elif E_Left in pressed:
           if E_Left in newPressed or E_ScrollUp in instant:
-            ed.moveZoom(-1, 0)
-            ed.moveCursor(-1, 0)
+            ed.moveZoom(-scrollSpeed, 0)
+            ed.moveCursor(-scrollSpeed, 0)
           elif E_ScrollUp in instant:
-            ed.moveZoom(1, 0)
-            ed.moveCursor(1, 0)
+            ed.moveZoom(scrollSpeed, 0)
+            ed.moveCursor(scrollSpeed, 0)
         elif E_Right in pressed:
           if E_Right in newpressed or E_ScrollDown in instant:
-            ed.moveZoom(1, 0)
-            ed.moveCursor(1, 0)
+            ed.moveZoom(scrollSpeed, 0)
+            ed.moveCursor(scrollSpeed, 0)
           elif E_ScrollUp in instant:
-            ed.moveZoom(-1, 0)
-            ed.moveCursor(-1, 0)
+            ed.moveZoom(-scrollSpeed, 0)
+            ed.moveCursor(-scrollSpeed, 0)
         elif E_ScrollUp in instant:
           ed.changeZoom(true)
         elif E_ScrollDown in instant:
@@ -297,27 +299,27 @@ proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[Instan
           ed.deferSave()
       elif E_ScrollUp in instant:
         if E_Right in pressed or E_Left in pressed:
-          ed.moveCursor(+1, 0)
+          ed.moveCursor(+scrollSpeed, 0)
         else:
-          ed.moveCursor(0, -1)
+          ed.moveCursor(0, -scrollSpeed)
         if E_A in pressed:
           ed[ed.cursorX, ed.cursorY] = ed.cursorColor
           ed.deferSave()
       elif E_ScrollDown in instant:
         if E_Right in pressed or E_Left in pressed:
-          ed.moveCursor(-1, 0)
+          ed.moveCursor(-scrollSpeed, 0)
         else:
-          ed.moveCursor(0, +1)
+          ed.moveCursor(0, +scrollSpeed)
         if E_A in pressed:
           ed[ed.cursorX, ed.cursorY] = ed.cursorColor
           ed.deferSave()
       elif E_ScrollRight in instant:
-        ed.moveCursor(+1, 0)
+        ed.moveCursor(+scrollSpeed, 0)
         if E_A in pressed:
           ed[ed.cursorX, ed.cursorY] = ed.cursorColor
           ed.deferSave()
       elif E_ScrollLeft in instant:
-        ed.moveCursor(-1, 0)
+        ed.moveCursor(-scrollSpeed, 0)
         if E_A in pressed:
           ed[ed.cursorX, ed.cursorY] = ed.cursorColor
           ed.deferSave()
@@ -339,20 +341,20 @@ proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[Instan
         ed.deferSave()
       if E_ScrollUp in instant:
         if E_Right in pressed or E_Left in pressed:
-          movePickerCursor(+2, 0)
+          movePickerCursor(+scrollSpeed, 0)
           ed.deferSave()
         elif E_Up in pressed or E_Down in pressed:
-          movePickerCursor(0, -2)
+          movePickerCursor(0, -scrollSpeed)
           ed.deferSave()
         else:
           changePickerValue(valueStep)
           ed.deferSave()
       elif E_ScrollDown in instant:
         if E_Right in pressed or E_Left in pressed:
-          movePickerCursor(-2, 0)
+          movePickerCursor(-scrollSpeed, 0)
           ed.deferSave()
         elif E_Up in pressed or E_Down in pressed:
-          movePickerCursor(0, +2)
+          movePickerCursor(0, +scrollSpeed)
           ed.deferSave()
         else:
           changePickerValue(-valueStep)
