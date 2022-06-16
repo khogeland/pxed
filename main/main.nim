@@ -71,6 +71,9 @@ app_main():
       var powerSave = false
       var lastLoop: TickType_t
       while true:
+        if getBatteryLevel() < 0.0:
+          bigscreen.shutdown()
+          hibernate()
         #echo "loop: " & $(xTaskGetTickCount() - lastLoop)
         lastLoop = xTaskGetTickCount()
         delayMillis(1)

@@ -97,9 +97,10 @@ proc initEditorNewFile*(path: string, w, h: int): Editor =
   )
   result.setup()
 
-proc saveImage*(ed: Editor) =
+proc saveImage*(ed: var Editor) =
   if ed.saveWaiting:
     writeTGA(ed.path, ed.image.tga)
+    ed.saveWaiting = false
 
 proc deferSave(ed: var Editor) =
   ed.saveWaiting = true
@@ -107,7 +108,6 @@ proc deferSave(ed: var Editor) =
 
 proc maybeSave*(ed: var Editor) =
   if ed.saveWaiting and cpuTime() > ed.saveTime:
-    ed.saveWaiting = false
     ed.saveImage()
 
 proc `[]`*(ed: Editor, x, y: int): uint8 = ed.image.contents[(y * ed.w) + x]

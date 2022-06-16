@@ -194,6 +194,8 @@ proc esp_sleep_pd_config*(domain: esp_sleep_pd_domain_t;
 ## !!!Ignored construct:  void esp_deep_sleep_start ( void ) __attribute__ ( ( noreturn ) ) ;
 ## Error: expected ';'!!!
 
+proc esp_deep_sleep_start*(): esp_err_t {.importc: "esp_deep_sleep_start".}
+
 ## *
 ##  @brief Enter light sleep with the configured wakeup options
 ##
@@ -201,6 +203,7 @@ proc esp_sleep_pd_config*(domain: esp_sleep_pd_domain_t;
 ##   - ESP_OK on success (returned after wakeup)
 ##   - ESP_ERR_INVALID_STATE if WiFi or BT is not stopped
 ##
+
 
 proc esp_light_sleep_start*(): esp_err_t {.importc: "esp_light_sleep_start".}
 ## *

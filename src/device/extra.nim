@@ -6,6 +6,7 @@ import nesper/gpios
 import pins
 import gfx/sprites
 import device/esp_adc_cal
+import device/esp_sleep
 
 var adcChars: esp_adc_cal_characteristics_t
 var batterySprite: Sprite
@@ -21,11 +22,12 @@ proc initSystemStuff*(): void =
   check adc1_config_channel_atten(ADC1_CHANNEL_8, ADC_ATTEN_DB_11)
   discard esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_13, 0, addr adcChars)
 
-# assuming a max battery voltage of 4.2v
 # (100/570)*4200mV
-const maxVoltage = 736.84212
+const minVoltage = 578.94738
+const maxVoltage = 736.84212 - minVoltage
+# (100/570)*3300mV
 proc getBatteryLevel*(): float =
-  return esp_adc_cal_raw_to_voltage(adc1_get_raw(ADC1_CHANNEL_8).uint32, addr adcChars).float/maxVoltage
+  return (esp_adc_cal_raw_to_voltage(adc1_get_raw(ADC1_CHANNEL_8).uint32, addr adcChars).float-minVoltage)/maxVoltage
 
 proc loadBatterySprite*() =
   # TODO this sprite sucks
@@ -45,3 +47,6 @@ proc showBattery*() =
 
 proc hideBattery*() =
   batterySprite.hide()
+
+proc hibernate*() =
+  check esp_deep_sleep_start()
