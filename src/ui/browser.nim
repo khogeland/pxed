@@ -70,17 +70,22 @@ proc sample(img18: RGB18Image): RGB18Image =
       result.contents[i2] = img18.contents[i]
 
 proc loadPreview(path: string): Preview =
-  result.empty = false
-  result.path = path
-  let img18 = readTGA(path).img18
-  if img18.w == 32 and img18.h == 32:
-    result.img = zoom(img18)
-  elif img18.w == 64 and img18.h == 64:
-    result.img = img18
-  elif img18.w == 128 and img18.h == 128:
-    result.img = sample(img18)
-  else:
-    raise newException(ValueError, path & ": unsupported image size: " & $img18.w & " * " & $img18.h)
+  try:
+    result.empty = false
+    result.path = path
+    let img18 = readTGA(path).img18
+    if img18.w == 32 and img18.h == 32:
+      result.img = zoom(img18)
+    elif img18.w == 64 and img18.h == 64:
+      result.img = img18
+    elif img18.w == 128 and img18.h == 128:
+      result.img = sample(img18)
+    else:
+      raise newException(ValueError, path & ": unsupported image size: " & $img18.w & " * " & $img18.h)
+  except:
+    echo getCurrentException().msg
+    # TODO
+    return Preview(empty: true)
 
 proc updatePalette(br: var Browser) =
   let p = br.getSelection()
@@ -150,7 +155,6 @@ proc initPreviews(br: var Browser) =
   br.updatePalette()
 
 proc initBrowser*(index: int = -1): Browser =
-  echo "arstarst " & $fileExists("/data/images/0.tga")
   result.fileList = newSeq[string]()
   for f in sorted(toSeq(listStorageDir("images"))):
     if f.toLowerAscii.endsWith(".tga"):

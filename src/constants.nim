@@ -10,6 +10,8 @@ func max*(a, b: u6): u6 = max(uint8(a), uint8(b)).u6
 func min*(a, b: u6): u6 = min(uint8(a), uint8(b)).u6
 func `==`*(a, b: u6): bool = uint8(a) == uint8(b)
 
+var CLOCK_MONOTONIC {.importc: "CLOCK_MONOTONIC", header: "<time.h>".}: cint
+
 type ButtonInput* = enum
   E_Up
   E_Down

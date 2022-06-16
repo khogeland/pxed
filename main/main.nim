@@ -12,6 +12,7 @@ import ui/picker
 import ui/boss
 import msgpack4nim
 import framebuffer
+import posix
 
 type DeviceSettings = object
   brightness: uint8
@@ -68,10 +69,16 @@ app_main():
       bigscreen.setBrightness(settings.brightness)
       bigscreen.setContrast(settings.contrastR, settings.contrastG, settings.contrastB)
 
-      var powerSave = false
       var lastLoop: TickType_t
+      var lastActivity: int
+      var screenIsOff = false
+      const screenOffDelay = 60
+      const deepsleepDelay = 600
       while true:
-        if getBatteryLevel() < 0.0:
+        let batteryLevel = getBatteryLevel()
+        if batteryLevel < 5.0:
+          showBattery()
+        if batteryLevel < 0.0:
           bigscreen.shutdown()
           hibernate()
         #echo "loop: " & $(xTaskGetTickCount() - lastLoop)
@@ -82,7 +89,10 @@ app_main():
         states.add(InputState(pressed: pollButtons()))
         hideBattery()
         var scrollSpeed = 1
+        var buttonsHappened = false
         for s in states:
+          if len(s.pressed) != 0 or len(s.instant) != 0:
+            buttonsHappened = true
           if E_B in s.pressed and E_Y in s.pressed: # device control
             #echo getBatteryLevel()
             showBattery()
@@ -102,12 +112,6 @@ app_main():
                 settings.contrastB.adjust(+5)
               elif E_ScrollDown in s.instant:
                 settings.contrastB.adjust(-5)
-            elif E_Down in s.pressed:
-              if E_ScrollUp in s.instant:
-                powerSave = true
-              elif E_ScrollDown in s.instant:
-                powerSave = false
-              echo powerSave
             elif E_ScrollUp in s.instant:
               settings.brightness = uint8(max(0, min(15, int(settings.brightness)+1)))
             elif E_ScrollDown in s.instant:
@@ -136,10 +140,23 @@ app_main():
         # the screen SPI clock makes this very slow, but the esp32s2 is single-core :(
         # eliminating this delay would double the framerate but would require a second core
         # i.e. esp32s3 or a second mcu
-        # TODO possible optimization: might be possible to update only a region of display ram
+        # TODO optimization: might be possible to update only a region of display ram
         bigscreen.sendBuffer(SCREEN_HEIGHT * SCREEN_WIDTH * 24, addr buffer)
         #echo "sendBuffer: " & $(xTaskGetTickCount() - time)
         #echo "rendered"
+        var ts: Timespec
+        discard clock_gettime(CLOCK_MONOTONIC, ts)
+        if buttonsHappened:
+          lastActivity = ts.tv_sec.int
+          if screenIsOff:
+            bigscreen.displayOn()
+            screenIsOff = false
+        else:
+          if (not screenIsOff) and lastActivity + screenOffDelay < ts.tv_sec.int:
+            bigscreen.displayOff()
+            screenIsOff = true
+          if lastActivity + deepsleepDelay < ts.tv_sec.int: # someone forgot about us
+            hibernate()
     except:
       let e = getCurrentException()
       echo e.msg

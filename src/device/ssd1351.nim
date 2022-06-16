@@ -91,7 +91,7 @@ proc initScreen*(dev: SpiDev) = withSpiBus(dev):
 
   logi(TAG, "Display enabled")
 
-proc setBrightness*(dev: SpiDev, brightness: uint8): void =
+proc setBrightness*(dev: SpiDev, brightness: uint8) =
   var b = brightness
   dev.sendCommand(CMD_CONTRASTMASTER)
   dev.sendData(8, addr b)
@@ -101,7 +101,21 @@ proc sendBuffer*(dev: SpiDev, length: uint, data: pointer) =
   dev.sendCommand(uint8(CMD_WRITERAM))
   dev.sendData(length, data)
 
-proc shutdown*(dev: SpiDev): void =
+proc displayOn*(dev: SpiDev) =
+  #TODO cannot turn regulator back on. might be impossible due to some hw issue.
+  #dev.sendCommand(CMD_FUNCTIONSELECT)
+  #var args: uint8 = 1
+  #dev.sendData(8, addr args)
+  #delayMillis(10)
+  dev.sendCommand(CMD_DISPLAYON)
+
+proc displayOff*(dev: SpiDev) =
+  dev.sendCommand(CMD_DISPLAYOFF)
+  #dev.sendCommand(CMD_FUNCTIONSELECT)
+  #var args: uint8 = 0
+  #dev.sendData(8, addr args)
+
+proc shutdown*(dev: SpiDev) =
   dev.sendCommand(CMD_DISPLAYOFF)
   dev.sendCommand(CMD_FUNCTIONSELECT)
   var args: uint8 = 0

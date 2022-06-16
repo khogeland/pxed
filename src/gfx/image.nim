@@ -204,7 +204,6 @@ proc writeTGA*(f: File, tga: TGA): void =
     discard f.writeBuffer(addr tga.data[0], len(tga.data))
 
 proc writeTGA*(path: string, tga: TGA): void =
-  echo path
   var f: File
   if not f.open(path, fmWrite):
     raise newException(OSError, "could not open file")

@@ -1,4 +1,4 @@
-import times
+import posix
 import constants
 import color
 import framebuffer
@@ -30,13 +30,13 @@ type Editor* = object
   currentUI: UIType
   path*: string
   saveWaiting: bool
-  saveTime: float
+  saveTime: int
   colorSwapping: bool
   colorSwap: uint8
   zoom: int
   zoomX, zoomY: int
 
-const saveDelay = 1.0
+const saveDelay: int = 2
 var paletteBack: Sprite
 var paletteBacks: seq[Sprite]
 var paletteWheel: Sprite
@@ -102,12 +102,17 @@ proc saveImage*(ed: var Editor) =
     writeTGA(ed.path, ed.image.tga)
     ed.saveWaiting = false
 
+# TODO: cpuTime not working
 proc deferSave(ed: var Editor) =
   ed.saveWaiting = true
-  ed.saveTime = cpuTime() + saveDelay
+  var ts: Timespec
+  discard clock_gettime(CLOCK_MONOTONIC, ts)
+  ed.saveTime = ts.tv_sec.int + saveDelay
 
 proc maybeSave*(ed: var Editor) =
-  if ed.saveWaiting and cpuTime() > ed.saveTime:
+  var ts: Timespec
+  discard clock_gettime(CLOCK_MONOTONIC.ClockId, ts)
+  if ed.saveWaiting and ts.tv_sec.int > ed.saveTime:
     ed.saveImage()
 
 proc `[]`*(ed: Editor, x, y: int): uint8 = ed.image.contents[(y * ed.w) + x]
@@ -198,6 +203,9 @@ proc handleInput*(ed: var Editor, pressed: set[ButtonInput], instant: set[Instan
   var newPressed = pressed
   newPressed.excl(ed.lastPressed)
   ed.lastPressed = pressed
+  if (len(pressed) != 0 or len(instant) != 0) and ed.saveWaiting:
+    # extend save while user is actively pressing buttons
+    ed.deferSave()
   # TODO: hack around my laptop's arrow key rollover limitation so I can make this require all 4
   if E_Left in pressed and E_Right in pressed:
     hideEditorSprites()

@@ -18,5 +18,5 @@ idf_build_set_property(C_COMPILE_OPTIONS -Wno-error=address APPEND)
 idf_build_set_property(C_COMPILE_OPTIONS -Wno-unused-but-set-variable APPEND)
 
 spiffs_create_partition_image(res ../resources FLASH_IN_PROJECT)
-# we don't want to wipe user data on error, so format manually when necessary
-#fatfs_create_spiflash_image(userdata ../empty_flash)
+# format manually with `idf userdata-flash`
+littlefs_create_partition_image(userdata ../empty_flash)
